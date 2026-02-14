@@ -2,6 +2,8 @@ import prisma from '@/lib/db';
 import { Badge } from 'lucide-react';
 import Image from 'next/image';
 
+export const dynamic = 'force-dynamic';
+
 async function getStats() {
   const channelCount = await prisma.channel.count({ where: { isActive: true } });
   const liveCount = await prisma.stream.count({ where: { status: 'live' } });
