@@ -58,9 +58,16 @@ RUN chown nextjs:nodejs /app/data
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Install prisma globally so we can use it in entrypoint script (since standalone build doesn't include devDependencies)
+RUN npm install -g prisma@5
+
 # Ensure entrypoint has execution permissions
 COPY --chown=nextjs:nodejs entrypoint.sh ./
 RUN chmod +x entrypoint.sh
+
+# Copy necessary files for database management in runtime
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/package.json ./package.json
 
 USER nextjs
 
