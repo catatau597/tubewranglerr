@@ -1,20 +1,24 @@
 services:
   app:
     container_name: tubewranglerr
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: tubewranglerr:latest
+    hostname: tubewranglerr
+    image: ghcr.io/catatau597/tubewranglerr:latest
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=file:/app/prisma/database.db
+      - DATABASE_URL=file:/app/data/database.db
       - NEXT_TELEMETRY_DISABLED=1
-      # Adicione outras variáveis de ambiente necessárias aqui
+      - TZ=America/Sao_Paulo # Ajuste conforme seu fuso horário
     volumes:
       # Persistência do banco de dados SQLite
-      - ./prisma:/app/prisma
+      # A pasta 'data' será criada no host com as permissões corretas
+      - ./data:/app/data
     restart: unless-stopped
+    # Opcional: Limites de recursos para evitar consumo excessivo
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:3000"]
       interval: 30s
