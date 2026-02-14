@@ -1,0 +1,22 @@
+services:
+  app:
+    container_name: tubewranglerr
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tubewranglerr:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=file:/app/prisma/database.db
+      - NEXT_TELEMETRY_DISABLED=1
+      # Adicione outras variáveis de ambiente necessárias aqui
+    volumes:
+      # Persistência do banco de dados SQLite
+      - ./prisma:/app/prisma
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
