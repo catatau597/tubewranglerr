@@ -12,7 +12,7 @@
     "start": "next start",
     "lint": "next lint",
     "docker:build": "docker build -t tubewranglerr:test .",
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "node prisma/seed.js"
   },
   "repository": {
     "type": "git",
