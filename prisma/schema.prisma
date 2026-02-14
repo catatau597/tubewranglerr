@@ -1,0 +1,99 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------------------------------------
+// CONFIGURAÇÃO GLOBAL (Key-Value Store para as 48 Variáveis)
+// --------------------------------------------------------
+model Config {
+  key         String   @id // Nome da Variável (ex: "SCHEDULER_MAIN_INTERVAL_HOURS")
+  value       String   // Valor serializado (JSON string se necessário)
+  type        String   // "string", "int", "bool", "json", "list"
+  category    String   // Categoria UI (1-9)
+  description String?  // Descrição para UI
+  updatedAt   DateTime @updatedAt
+}
+
+// --------------------------------------------------------
+// CANAIS MONITORADOS
+// --------------------------------------------------------
+model Channel {
+  id              String   @id // Channel ID (ex: "UCxxxxxxxx")
+  handle          String?  // @handle (ex: "@cazetv")
+  title           String   // Nome do Canal (pode ser sobrescrito pelo mapping)
+  customName      String?  // Nome personalizado (mapeamento manual)
+  thumbnailUrl    String?  // Avatar do canal
+  lastSync        DateTime? // Data da última verificação completa
+  isActive        Boolean  @default(true) // Monitorar este canal?
+  
+  streams         Stream[] // Relação 1:N
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// --------------------------------------------------------
+// STREAMS & EVENTOS
+// --------------------------------------------------------
+model Stream {
+  videoId         String   @id // YouTube Video ID
+  channelId       String
+  channel         Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  
+  title           String   // Título original
+  description     String?  // Descrição completa
+  status          String   // "live", "upcoming", "none" (vod/ended)
+  
+  // URLs e Imagens
+  thumbnailUrl    String?
+  watchUrl        String   // URL do YouTube
+  
+  // Datas e Agendamento
+  scheduledStart  DateTime?
+  actualStart     DateTime?
+  actualEnd       DateTime?
+  durationISO     String?  // Duração (P0DT0H0M0S)
+  
+  // Metadados Adicionais
+  categoryYoutube String?  // ID da categoria (ex: "17")
+  tags            String?  // JSON string array de tags
+  isAgeRestricted Boolean  @default(false)
+  
+  lastSeen        DateTime @default(now()) // Última vez visto na API
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
+  @@index([channelId])
+}
+
+// --------------------------------------------------------
+// USUÁRIOS (Autenticação Multi-usuário)
+// --------------------------------------------------------
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String   // Hash bcrypt
+  role      String   @default("user") // "admin", "user"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// --------------------------------------------------------
+// LOGS (Opcional: Persistência de Logs no DB além de arquivo)
+// --------------------------------------------------------
+model Log {
+  id        Int      @id @default(autoincrement())
+  level     String   // "INFO", "WARN", "ERROR"
+  component String   // "Scheduler", "SmartPlayer", "API"
+  message   String
+  timestamp DateTime @default(now())
+
+  @@index([timestamp])
+}
