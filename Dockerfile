@@ -40,7 +40,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV DATABASE_URL=file:./prisma/database.db
+ENV DATABASE_URL=file:/app/data/database.db
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -57,6 +57,10 @@ RUN chown nextjs:nodejs /app/data
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy Prisma schema and data dir
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
 
 # Install prisma globally so we can use it in entrypoint script (since standalone build doesn't include devDependencies)
 RUN npm install -g prisma@5
