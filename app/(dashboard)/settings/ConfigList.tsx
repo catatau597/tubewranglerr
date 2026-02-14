@@ -112,12 +112,12 @@ export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigI
             {items.map((config) => (
               <div key={config.key} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center border-b pb-4 last:border-0 last:pb-0">
                 <div>
-                  <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    {config.key}
-                  </label>
-                  <p className="text-[0.8rem] text-muted-foreground mt-1">
-                    {config.description || 'Sem descrição'}
+                  <p className="text-sm font-medium leading-none mb-1">
+                    {config.description || config.key}
                   </p>
+                  <code className="text-[0.75rem] text-muted-foreground bg-muted/50 px-1 py-0.5 rounded font-mono">
+                    {config.key}
+                  </code>
                 </div>
                 <div className="relative">
                   {renderInput(config)}

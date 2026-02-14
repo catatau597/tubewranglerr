@@ -192,6 +192,67 @@ async function main() {
     });
   }
 
+  // --- POPULATE CHANNELS FROM ENV ---
+  console.log('Syncing channels from TARGET_CHANNEL_HANDLES...');
+  
+  const handlesConfig = await prisma.config.findUnique({ where: { key: 'TARGET_CHANNEL_HANDLES' } });
+  const idsConfig = await prisma.config.findUnique({ where: { key: 'TARGET_CHANNEL_IDS' } });
+
+  try {
+    let handles = [];
+    let ids = [];
+
+    // Parse JSON safely
+    if (handlesConfig && handlesConfig.value) {
+      // Handle both JSON array string and comma-separated string
+      if (handlesConfig.value.trim().startsWith('[')) {
+        handles = JSON.parse(handlesConfig.value);
+      } else {
+        handles = handlesConfig.value.split(',').map(s => s.trim()).filter(Boolean);
+      }
+    }
+
+    if (idsConfig && idsConfig.value) {
+      if (idsConfig.value.trim().startsWith('[')) {
+        ids = JSON.parse(idsConfig.value);
+      } else {
+        ids = idsConfig.value.split(',').map(s => s.trim()).filter(Boolean);
+      }
+    }
+
+    // Upsert channels
+    for (const handle of handles) {
+      const cleanHandle = handle.startsWith('@') ? handle : `@${handle}`;
+      await prisma.channel.upsert({
+        where: { id: cleanHandle }, // Temporarily use handle as ID until synced
+        update: { isActive: true },
+        create: {
+          id: cleanHandle,
+          handle: cleanHandle,
+          title: cleanHandle,
+          isActive: true
+        }
+      });
+      console.log(`Synced channel: ${cleanHandle}`);
+    }
+
+    for (const id of ids) {
+      await prisma.channel.upsert({
+        where: { id },
+        update: { isActive: true },
+        create: {
+          id: id,
+          title: `Channel ${id}`,
+          isActive: true
+        }
+      });
+      console.log(`Synced channel ID: ${id}`);
+    }
+
+  } catch (err) {
+    console.error('Error syncing channels from config:', err);
+  }
+
   console.log('✅ Seed completed successfully.');
 }
 

@@ -35,17 +35,16 @@ export default function ChannelList({ initialChannels }: { initialChannels: Chan
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error('Erro ao adicionar');
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || 'Erro ao adicionar');
 
       router.refresh();
       setShowForm(false);
       setFormData({ identifier: '' });
-      // Idealmente recarregamos a lista ou otimisticamente adicionamos
-      // router.refresh() cuida disso no server component pai, mas aqui é client
-      // Vamos forçar um reload window ou fetch manual se precisar, mas o refresh do router deve bastar
       window.location.reload(); 
-    } catch (error) {
-      alert('Erro ao adicionar canal. Verifique se ele já existe.');
+    } catch (error: any) {
+      alert(error.message);
     } finally {
       setLoading(false);
     }
