@@ -7,7 +7,12 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const configs = await prisma.config.findMany({
-      orderBy: { category: 'asc' }
+      orderBy: { category: 'asc' },
+      where: {
+        key: {
+          notIn: ['TARGET_CHANNEL_HANDLES', 'TARGET_CHANNEL_IDS']
+        }
+      }
     });
     return NextResponse.json(configs);
   } catch (error) {
