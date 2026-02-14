@@ -34,7 +34,7 @@ export async function POST(req: Request) {
         handle: handle || null,
         title: title || handle || 'Novo Canal',
         isActive: true,
-        lastSynced: new Date()
+        lastSync: new Date()
       }
     });
 
