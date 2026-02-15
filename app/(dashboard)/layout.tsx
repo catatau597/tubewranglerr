@@ -32,108 +32,74 @@ export default function DashboardLayout({
 
   return (
     <>
-    <div className="grid h-screen w-full pl-[56px]">
-      <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">
-        <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
-          <Link
-            href="#"
-            className="group flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:h-8 md:w-8 md:text-base"
-          >
-            <Tv className="h-4 w-4 transition-all group-hover:scale-110" />
-            <span className="sr-only">TubeWranglerr</span>
-          </Link>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link
-                  href="/"
-                  className={`flex h-9 w-9 items-center justify-center rounded-lg ${pathname === '/' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'} transition-colors hover:text-foreground md:h-8 md:w-8`}
-                >
-                  <LayoutDashboard className="h-5 w-5" />
-                  <span className="sr-only">Dashboard</span>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">Dashboard</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link
-                  href="/channels"
-                  className={`flex h-9 w-9 items-center justify-center rounded-lg ${pathname.startsWith('/channels') ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'} transition-colors hover:text-foreground md:h-8 md:w-8`}
-                >
-                  <Radio className="h-5 w-5" />
-                  <span className="sr-only">Canais</span>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">Canais</TooltipContent>
-            </Tooltip>
-             <Tooltip>
-              <TooltipTrigger asChild>
-                <Link
-                  href="/events"
-                  className={`flex h-9 w-9 items-center justify-center rounded-lg ${pathname.startsWith('/events') ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'} transition-colors hover:text-foreground md:h-8 md:w-8`}
-                >
-                  <ListVideo className="h-5 w-5" />
-                  <span className="sr-only">Eventos</span>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">Eventos</TooltipContent>
-            </Tooltip>
-             <Tooltip>
-              <TooltipTrigger asChild>
-                <Link
-                  href="/playlists"
-                  className={`flex h-9 w-9 items-center justify-center rounded-lg ${pathname.startsWith('/playlists') ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'} transition-colors hover:text-foreground md:h-8 md:w-8`}
-                >
-                  <PlaySquare className="h-5 w-5" />
-                  <span className="sr-only">Playlists</span>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">Playlists</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </nav>
-        <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link
-                  href="/settings"
-                  className={`flex h-9 w-9 items-center justify-center rounded-lg ${pathname.startsWith('/settings') ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'}  transition-colors hover:text-foreground md:h-8 md:w-8`}
-                >
-                  <Settings className="h-5 w-5" />
-                  <span className="sr-only">Configurações</span>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">Configurações</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          {/* Sub-menu de Configurações */}
-          {pathname.startsWith('/settings') && (
-          <nav className="mt-2 flex flex-col items-start gap-1 px-2 text-sm font-medium">
+    <div className="grid h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
+      <aside className="hidden border-r bg-muted/40 md:block">
+        <div className="flex h-full max-h-screen flex-col gap-2">
+          <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
+            <Link href="/" className="flex items-center gap-2 font-semibold">
+              <Tv className="h-6 w-6 text-red-600" />
+              <span className="">TubeWranglerr</span>
+            </Link>
+          </div>
+          <div className="flex-1">
+            <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
               <Link
-                  href="/settings"
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings' ? 'bg-muted text-primary' : ''}`}
+                href="/"
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/' ? 'bg-muted text-primary' : ''}`}
               >
-                  <Settings className="h-4 w-4" />
-                  Geral
+                <LayoutDashboard className="h-4 w-4" />
+                Dashboard
               </Link>
               <Link
-                  href="/settings/title-format"
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings/title-format' ? 'bg-muted text-primary' : ''}`}
+                href="/channels"
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname.startsWith('/channels') ? 'bg-muted text-primary' : ''}`}
               >
-                  <Palette className="h-4 w-4" />
-                  Formato de Título
+                <Radio className="h-4 w-4" />
+                Canais
               </Link>
-          </nav>
-          )}
-        </nav>
+              <Link
+                href="/events"
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname.startsWith('/events') ? 'bg-muted text-primary' : ''}`}
+              >
+                <ListVideo className="h-4 w-4" />
+                Eventos
+              </Link>
+              <Link
+                href="/playlists"
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname.startsWith('/playlists') ? 'bg-muted text-primary' : ''}`}
+              >
+                <PlaySquare className="h-4 w-4" />
+                Playlists
+              </Link>
+              <Link
+                href="/settings"
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname.startsWith('/settings') ? 'bg-muted text-primary' : ''}`}
+              >
+                <Settings className="h-4 w-4" />
+                Configurações
+              </Link>
+              
+              {/* Sub-menu de Configurações */}
+              {pathname.startsWith('/settings') && (
+              <nav className="ml-4 mt-2 flex flex-col items-start gap-1 text-sm font-medium">
+                  <Link
+                      href="/settings/title-format"
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings/title-format' ? 'bg-muted text-primary' : ''}`}
+                  >
+                      <Palette className="h-4 w-4" />
+                      Formato de Título
+                  </Link>
+              </nav>
+              )}
+            </nav>
+          </div>
+        </div>
       </aside>
-      <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
+      <div className="flex flex-col">
+        <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
+           {/* Header content pode vir aqui no futuro, como busca ou perfil do usuário */}
         </header>
-        <main className="grid flex-1 gap-4 overflow-auto p-4 md:grid-cols-1">
+        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 overflow-auto">
             {children}
         </main>
       </div>

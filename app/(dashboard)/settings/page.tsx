@@ -4,9 +4,8 @@ import ConfigList from './ConfigList';
 export const dynamic = 'force-dynamic';
 
 async function getConfigs() {
-  return await prisma.config.findMany({
-    orderBy: { category: 'asc' }
-  });
+  // Removido o orderBy inválido
+  return await prisma.config.findMany();
 }
 
 export default async function SettingsPage() {

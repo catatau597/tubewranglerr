@@ -8,6 +8,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const channelId = params.id; // Pega o ID dos parâmetros da URL
     const body = await request.json();
     const { isActive } = body;
 
@@ -16,7 +17,7 @@ export async function PATCH(
     }
 
     const updatedChannel = await prisma.channel.update({
-      where: { id: params.id },
+      where: { id: channelId },
       data: { isActive },
     });
 
@@ -29,17 +30,17 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
+    const channelId = params.id; // Pega o ID dos parâmetros da URL
 
-    if (!id) {
+    if (!channelId) {
       return NextResponse.json({ error: 'ID do canal obrigatório' }, { status: 400 });
     }
 
     await prisma.channel.delete({
-      where: { id }
+      where: { id: channelId }
     });
 
     return NextResponse.json({ success: true });

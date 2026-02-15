@@ -124,6 +124,10 @@ export default function ChannelList({ initialChannels }: { initialChannels: Chan
   };
 
   const handleRunGlobalSync = () => {
+    if (channels.length === 0) {
+      toast.info('Adicione pelo menos um canal antes de sincronizar.');
+      return;
+    }
     setGlobalSyncLoading(true);
     const promise = fetch('/api/cron/run', { method: 'POST' });
     toast.promise(promise, {
