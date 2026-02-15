@@ -5,10 +5,24 @@ import { addHours, isAfter, isBefore } from 'date-fns';
 
 const youtube = google.youtube('v3');
 
-async function getApiKey() {
-  const apiKey = await getConfig('YOUTUBE_API_KEY');
-  if (!apiKey) throw new Error('YOUTUBE_API_KEY not found in configuration');
-  return apiKey;
+// Variável em memória para rastrear o índice da chave de API
+let apiKeyIndex = 0;
+
+async function getApiKey(): Promise<string> {
+  const apiKeysConfig = await getConfig('YOUTUBE_API_KEY');
+  if (!apiKeysConfig) throw new Error('YOUTUBE_API_KEY not found in configuration');
+
+  const apiKeys = apiKeysConfig.split(',').filter(Boolean);
+  if (apiKeys.length === 0) throw new Error('No valid YouTube API keys found.');
+  
+  // Lógica de Round-Robin
+  const keyToUse = apiKeys[apiKeyIndex];
+  apiKeyIndex = (apiKeyIndex + 1) % apiKeys.length;
+  
+  // Log para depuração, mostrando qual chave está sendo usada.
+  console.log(`Using API Key at index ${apiKeyIndex} (ending with ...${keyToUse.slice(-4)})`);
+
+  return keyToUse;
 }
 
 export async function syncChannels() {
@@ -230,5 +244,181 @@ export async function syncStreams() {
     } catch (error) {
       console.error('Error fetching video details:', error);
     }
+  }
+}
+
+export async function syncStreamsForChannel(channelId: string) {
+  const apiKey = await getApiKey();
+  const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+
+  if (!channel || !channel.isActive) {
+    console.warn(`Tentativa de sincronizar canal inativo ou inexistente: ${channelId}`);
+    return { newCount: 0, updatedCount: 0 };
+  }
+  
+  const usePlaylistItems = await getBoolConfig('USE_PLAYLIST_ITEMS', true);
+  const filterByCategory = await getBoolConfig('FILTER_BY_CATEGORY', false);
+  const allowedCategories = filterByCategory ? await getListConfig('ALLOWED_CATEGORY_IDS') : [];
+  
+  const videoIds = new Set<string>();
+
+  // 1. Find Video IDs for the specific channel
+  try {
+    if (usePlaylistItems) {
+      const chRes = await youtube.channels.list({
+        key: apiKey,
+        part: ['contentDetails'],
+        id: [channel.id]
+      });
+      const uploadsPlaylist = chRes.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+      
+      if (uploadsPlaylist) {
+        const plRes = await youtube.playlistItems.list({
+          key: apiKey,
+          part: ['contentDetails'],
+          playlistId: uploadsPlaylist,
+          maxResults: 25 // Um pouco mais generoso para sync individual
+        });
+        plRes.data.items?.forEach(item => item.contentDetails?.videoId && videoIds.add(item.contentDetails.videoId));
+      }
+    } else {
+      const searchRes = await youtube.search.list({
+          key: apiKey,
+          part: ['id'],
+          channelId: channel.id,
+          type: ['video'],
+          order: 'date',
+          maxResults: 15
+      });
+      searchRes.data.items?.forEach(item => item.id?.videoId && videoIds.add(item.id.videoId));
+    }
+  } catch (error) {
+    console.error(`Erro ao buscar streams para o canal ${channel.id}:`, error);
+    throw error; // Propaga o erro para a API route
+  }
+
+  // 2. Fetch Video Details & Update DB
+  let newCount = 0;
+  let updatedCount = 0;
+  const allVideoIds = Array.from(videoIds);
+  
+  for (let i = 0; i < allVideoIds.length; i += 50) {
+    const batch = allVideoIds.slice(i, i + 50);
+    if (batch.length === 0) continue;
+    
+    try {
+      const res = await youtube.videos.list({
+        key: apiKey,
+        part: ['snippet', 'liveStreamingDetails', 'contentDetails'],
+        id: batch
+      });
+
+      for (const item of res.data.items || []) {
+        if (!item.id || !item.snippet) continue;
+        
+        const liveStatus = item.snippet.liveBroadcastContent || 'none'; // live, upcoming, none
+        const categoryId = item.snippet.categoryId;
+        if (filterByCategory && categoryId && !allowedCategories.includes(categoryId)) continue;
+
+        const scheduledStart = item.liveStreamingDetails?.scheduledStartTime ? new Date(item.liveStreamingDetails.scheduledStartTime) : null;
+        const actualStart = item.liveStreamingDetails?.actualStartTime ? new Date(item.liveStreamingDetails.actualStartTime) : null;
+        const actualEnd = item.liveStreamingDetails?.actualEndTime ? new Date(item.liveStreamingDetails.actualEndTime) : null;
+
+        // Logic to determine status
+        let finalStatus = liveStatus === 'live' && actualStart && !actualEnd ? 'live' : (liveStatus === 'upcoming' ? 'upcoming' : 'none');
+
+        const existingStream = await prisma.stream.findUnique({ where: { videoId: item.id } });
+        if (existingStream) {
+          updatedCount++;
+        } else {
+          newCount++;
+        }
+
+        await prisma.stream.upsert({
+          where: { videoId: item.id },
+          update: { /* ... (dados de update) ... */ 
+            title: item.snippet.title || '',
+            status: finalStatus,
+            scheduledStart, actualStart, actualEnd,
+            lastSeen: new Date()
+          },
+          create: { /* ... (dados de create) ... */
+            videoId: item.id,
+            channelId: item.snippet.channelId!,
+            title: item.snippet.title || '',
+            description: item.snippet.description || '',
+            status: finalStatus,
+            thumbnailUrl: item.snippet.thumbnails?.maxres?.url || item.snippet.thumbnails?.high?.url,
+            watchUrl: `https://www.youtube.com/watch?v=${item.id}`,
+            scheduledStart, actualStart, actualEnd,
+            durationISO: item.contentDetails?.duration,
+            categoryYoutube: categoryId,
+            tags: JSON.stringify(item.snippet.tags || []),
+            isAgeRestricted: item.contentDetails?.contentRating?.ytRating === 'ytAgeRestricted',
+            lastSeen: new Date()
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao buscar detalhes dos vídeos:', error);
+      // Continua para o próximo batch em caso de erro
+    }
+  }
+  
+  await prisma.channel.update({
+      where: { id: channelId },
+      data: { lastSync: new Date() }
+  });
+
+  return { newCount, updatedCount };
+}
+
+export async function resolveChannel(handleOrId: string): Promise<{ id: string; title: string; handle?: string; thumbnailUrl?: string; } | null> {
+  const apiKey = await getApiKey();
+  const isHandle = handleOrId.startsWith('@');
+  const query = isHandle ? handleOrId : handleOrId;
+
+  try {
+    let channelData = null;
+
+    if (isHandle) {
+      const res = await youtube.search.list({
+        key: apiKey,
+        part: ['id', 'snippet'],
+        q: query,
+        type: ['channel'],
+        maxResults: 1
+      });
+      const item = res.data.items?.[0];
+      if (item?.id?.channelId) {
+        channelData = {
+          id: item.id.channelId,
+          title: item.snippet?.channelTitle || query,
+          handle: handleOrId,
+          thumbnailUrl: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url
+        };
+      }
+    } else {
+      // Assuming it's an ID
+      const res = await youtube.channels.list({
+        key: apiKey,
+        part: ['snippet'],
+        id: [query]
+      });
+      const item = res.data.items?.[0];
+      if (item?.id && item.snippet) {
+        channelData = {
+          id: item.id,
+          title: item.snippet.title,
+          thumbnailUrl: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url
+        };
+      }
+    }
+
+    return channelData;
+
+  } catch (error) {
+    console.error(`Error resolving channel ${handleOrId}:`, error);
+    return null;
   }
 }

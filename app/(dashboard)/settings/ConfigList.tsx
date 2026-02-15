@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Save } from 'lucide-react';
+import { toast } from 'sonner';
+import { TagInput } from '@/components/ui/TagInput';
 
 interface ConfigItem {
   key: string;
@@ -16,33 +18,50 @@ export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigI
   const router = useRouter();
   const [configs, setConfigs] = useState(initialConfigs);
   const [loading, setLoading] = useState<string | null>(null);
-  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  const handleSave = async (key: string, value: string) => {
+  const handleSave = async (key: string, value: string | string[]) => {
     setLoading(key);
-    setMessage(null);
+    
+    // Se for um array (do TagInput), transforma em string
+    const valueToSave = Array.isArray(value) ? value.join(',') : value;
+
+    const promise = fetch('/api/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value: valueToSave }),
+    });
+
+    toast.promise(promise, {
+        loading: `Salvando ${key}...`,
+        success: () => {
+            router.refresh();
+            // Atualiza o estado local para refletir a mudança
+            setConfigs(configs.map(c => c.key === key ? {...c, value: valueToSave} : c));
+            return 'Configuração salva!';
+        },
+        error: 'Erro ao salvar configuração.'
+    });
 
     try {
-      const res = await fetch('/api/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value }),
-      });
-
-      if (!res.ok) throw new Error('Falha ao salvar');
-
-      setMessage({ text: 'Configuração salva com sucesso!', type: 'success' });
-      router.refresh();
-    } catch (error) {
-      setMessage({ text: 'Erro ao salvar configuração.', type: 'error' });
+        await promise;
+    } catch (e) {
+        // o toast já trata o erro
     } finally {
-      setLoading(null);
-      // Clear message after 3 seconds
-      setTimeout(() => setMessage(null), 3000);
+        setLoading(null);
     }
   };
 
   const renderInput = (config: ConfigItem) => {
+    if (config.key === 'YOUTUBE_API_KEY' || config.key === 'TITLE_FILTER_EXPRESSIONS' || config.key === 'ALLOWED_CATEGORY_IDS') {
+      return (
+        <TagInput
+          initialTags={config.value ? config.value.split(',').filter(Boolean) : []}
+          onTagsChange={(tags) => handleSave(config.key, tags)}
+          disabled={loading === config.key}
+        />
+      );
+    }
+    
     switch (config.type) {
       case 'bool':
         return (
@@ -96,21 +115,15 @@ export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigI
 
   return (
     <div className="space-y-6">
-      {message && (
-        <div className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-          {message.text}
-        </div>
-      )}
-
       {Object.entries(groupedConfigs).map(([category, items]) => (
         <div key={category} className="rounded-xl border bg-card text-card-foreground shadow p-6">
           <h3 className="text-lg font-semibold leading-none tracking-tight mb-4">
-            Categoria {category}
+            {category}
           </h3>
           
           <div className="space-y-4">
             {items.map((config) => (
-              <div key={config.key} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center border-b pb-4 last:border-0 last:pb-0">
+              <div key={config.key} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start border-b pb-4 last:border-0 last:pb-0">
                 <div>
                   <p className="text-sm font-medium leading-none mb-1">
                     {config.description || config.key}

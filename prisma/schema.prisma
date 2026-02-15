@@ -14,12 +14,8 @@ datasource db {
 // CONFIGURAÇÃO GLOBAL (Key-Value Store para as 48 Variáveis)
 // --------------------------------------------------------
 model Config {
-  key         String   @id // Nome da Variável (ex: "SCHEDULER_MAIN_INTERVAL_HOURS")
-  value       String   // Valor serializado (JSON string se necessário)
-  type        String   // "string", "int", "bool", "json", "list"
-  category    String   // Categoria UI (1-9)
-  description String?  // Descrição para UI
-  updatedAt   DateTime @updatedAt
+  key   String @id
+  value String
 }
 
 // --------------------------------------------------------
