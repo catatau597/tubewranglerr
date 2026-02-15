@@ -44,6 +44,7 @@ export const CONFIG_METADATA: Record<string, { type: string, category: string, d
   'PLAYLIST_VOD_FILENAME': { type: 'string', category: 'Arquivos de Saída', description: 'Nome do arquivo da playlist de VODs (ex: vod.m3u8).' },
   'XMLTV_FILENAME': { type: 'string', category: 'Arquivos de Saída', description: 'Nome do arquivo do guia de programação (ex: epg.xml).' },
   'EPG_DESCRIPTION_CLEANUP': { type: 'bool', category: 'Arquivos de Saída', description: 'Limpar e formatar a descrição dos eventos no EPG.' },
+  'TITLE_FORMAT_CONFIG': { type: 'json', category: 'Formato de Título', description: 'Configuração avançada para o formato do título dos eventos.' },
 
   // Categoria 7: Mídia & Placeholders
   'PLACEHOLDER_IMAGE_URL': { type: 'url', category: 'Mídia & Placeholders', description: 'URL de uma imagem para usar quando um evento não tiver thumbnail.' },

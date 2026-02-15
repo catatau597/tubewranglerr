@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { TitleComponent } from '@/app/(dashboard)/settings/title-format/page';
+import { CONFIG_METADATA } from '@/lib/config-metadata';
 
 // Estrutura esperada para a configuração
 interface TitleFormatConfig {
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
     }
     
     const value = JSON.stringify(body);
+    const metadata = CONFIG_METADATA[CONFIG_KEY];
 
     // Usando upsert para criar ou atualizar a configuração
     await prisma.config.upsert({
@@ -58,6 +60,9 @@ export async function POST(req: Request) {
       create: { 
         key: CONFIG_KEY, 
         value: value,
+        type: metadata.type,
+        category: metadata.category,
+        description: metadata.description,
       },
     });
 
