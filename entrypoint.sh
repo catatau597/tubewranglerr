@@ -3,4 +3,4 @@ set -e
 
 # Start the application
 echo "Starting application..."
-exec npm start
+exec node server.js
