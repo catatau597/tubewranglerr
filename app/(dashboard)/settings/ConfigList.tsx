@@ -105,37 +105,51 @@ export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigI
     }
   };
 
-  // Não agrupar mais por categoria, pois cada página terá suas configs
-  const filteredConfigs = configs.filter(
-    (config) =>
-      config.key !== 'TARGET_CHANNEL_HANDLES' &&
-      config.key !== 'TARGET_CHANNEL_IDS'
-  );
+  // Group configs by category for display
+  const groupedConfigs = configs.reduce((acc, config) => {
+    // Filter out unwanted configs
+    if (config.key === 'TARGET_CHANNEL_HANDLES' || config.key === 'TARGET_CHANNEL_IDS') {
+      return acc;
+    }
+    
+    const cat = config.category || 'Geral';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(config);
+    return acc;
+  }, {} as Record<string, ConfigItem[]>);
 
   return (
-    <div className="rounded-xl border bg-card text-card-foreground shadow p-6">
-      <div className="space-y-4">
-        {filteredConfigs.map((config) => (
-          <div key={config.key} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start border-b pb-4 last:border-0 last:pb-0">
-            <div>
-              <p className="text-sm font-medium leading-none mb-1">
-                {config.description || config.key}
-              </p>
-              <code className="text-[0.75rem] text-muted-foreground bg-muted/50 px-1 py-0.5 rounded font-mono">
-                {config.key}
-              </code>
-            </div>
-            <div className="relative">
-              {renderInput(config)}
-              {loading === config.key && (
-                <div className="absolute right-2 top-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+    <div className="space-y-6">
+      {Object.entries(groupedConfigs).map(([category, items]) => (
+        <div key={category} className="rounded-xl border bg-card text-card-foreground shadow p-6">
+          <h3 className="text-lg font-semibold leading-none tracking-tight mb-4">
+            {category}
+          </h3>
+          
+          <div className="space-y-4">
+            {items.map((config) => (
+              <div key={config.key} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start border-b pb-4 last:border-0 last:pb-0">
+                <div>
+                  <p className="text-sm font-medium leading-none mb-1">
+                    {config.description || config.key}
+                  </p>
+                  <code className="text-[0.75rem] text-muted-foreground bg-muted/50 px-1 py-0.5 rounded font-mono">
+                    {config.key}
+                  </code>
                 </div>
-              )}
-            </div>
+                <div className="relative">
+                  {renderInput(config)}
+                  {loading === config.key && (
+                    <div className="absolute right-2 top-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }
