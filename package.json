@@ -47,7 +47,8 @@
     "react-dom": "^19.2.4",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
@@ -60,7 +61,6 @@
     "prisma": "^5.22.0",
     "tailwindcss": "^4.1.18",
     "ts-node": "^10.9.2",
-    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }
