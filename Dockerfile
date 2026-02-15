@@ -20,10 +20,10 @@ COPY . .
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Run migrations and seed the database during the build
+# Run migrations and seed the database during the build, explicitly passing the DATABASE_URL
 RUN touch prisma/database.db
-RUN npx prisma migrate deploy
-RUN npx prisma db seed
+RUN DATABASE_URL="file:./prisma/database.db" npx prisma migrate deploy
+RUN DATABASE_URL="file:./prisma/database.db" npx prisma db seed
 
 # Increase memory for build
 ENV NODE_OPTIONS="--max-old-space-size=4096"
