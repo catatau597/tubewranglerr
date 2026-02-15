@@ -20,13 +20,9 @@ COPY . .
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Next.js collects completely anonymous telemetry data about general usage.
-# Learn more here: https://nextjs.org/telemetry
-# Uncomment the following line in case you want to disable telemetry during the build.
-ENV NEXT_TELEMETRY_DISABLED=1
-
-# Ensure Prisma has a datasource during build (prerender/static generation)
-ENV DATABASE_URL=file:./prisma/database.db
+# Run migrations and seed the database during the build
+RUN npx prisma migrate deploy
+RUN npx prisma db seed
 
 # Increase memory for build
 ENV NODE_OPTIONS="--max-old-space-size=4096"
@@ -45,9 +41,14 @@ ENV DATABASE_URL=file:/app/data/database.db
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Copy the final application files
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+# Copy the populated database
+COPY --from=builder --chown=nextjs:nodejs /app/prisma/database.db ./data/database.db
+
 # Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
+RUN mkdir -p .next/cache
+RUN chown -R nextjs:nodejs .next .next/cache
 
 # Create data directory for SQLite persistence
 RUN mkdir -p /app/data
