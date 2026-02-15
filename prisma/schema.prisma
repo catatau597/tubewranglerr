@@ -14,8 +14,11 @@ datasource db {
 // CONFIGURAÇÃO GLOBAL (Key-Value Store para as 48 Variáveis)
 // --------------------------------------------------------
 model Config {
-  key   String @id
-  value String
+  key         String  @id
+  value       String
+  type        String  // 'string', 'int', 'bool', 'list', 'dict'
+  category    String  // Categoria para agrupar na UI
+  description String? // Descrição amigável para a UI
 }
 
 // --------------------------------------------------------
