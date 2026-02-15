@@ -12,7 +12,8 @@ import {
   Tv,
   LayoutDashboard,
   Radio,
-  PlaySquare
+  PlaySquare,
+  Key as KeyIcon
 } from 'lucide-react'
 import {
   Tooltip,
@@ -81,15 +82,57 @@ export default function DashboardLayout({
               
               {/* Sub-menu de Configurações */}
               {pathname.startsWith('/settings') && (
-              <nav className="ml-4 mt-2 flex flex-col items-start gap-1 text-sm font-medium">
+                <nav className="ml-4 mt-2 flex flex-col items-start gap-1 text-sm font-medium">
                   <Link
-                      href="/settings/title-format"
-                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings/title-format' ? 'bg-muted text-primary' : ''}`}
+                    href="/settings/api"
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings/api' ? 'bg-muted text-primary' : ''}`}
                   >
-                      <Palette className="h-4 w-4" />
-                      Formato de Título
+                    <KeyIcon className="h-4 w-4" />
+                    API & Credenciais
                   </Link>
-              </nav>
+                  <Link
+                    href="/settings/scheduler"
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings/scheduler' ? 'bg-muted text-primary' : ''}`}
+                  >
+                    <Bell className="h-4 w-4" />
+                    Agendador
+                  </Link>
+                  <Link
+                    href="/settings/filters"
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings/filters' ? 'bg-muted text-primary' : ''}`}
+                  >
+                    <ListVideo className="h-4 w-4" />
+                    Conteúdo & Filtros
+                  </Link>
+                  <Link
+                    href="/settings/title-format"
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings/title-format' ? 'bg-muted text-primary' : ''}`}
+                  >
+                    <Palette className="h-4 w-4" />
+                    Formato de Título
+                  </Link>
+                  <Link
+                    href="/settings/retention"
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings/retention' ? 'bg-muted text-primary' : ''}`}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Retenção (VOD)
+                  </Link>
+                  <Link
+                    href="/settings/output"
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings/output' ? 'bg-muted text-primary' : ''}`}
+                  >
+                    <PlaySquare className="h-4 w-4" />
+                    Arquivos de Saída
+                  </Link>
+                  <Link
+                    href="/settings/media"
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings/media' ? 'bg-muted text-primary' : ''}`}
+                  >
+                    <Youtube className="h-4 w-4" />
+                    Mídia & Placeholders
+                  </Link>
+                </nav>
               )}
             </nav>
           </div>
