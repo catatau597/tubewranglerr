@@ -21,6 +21,7 @@ COPY . .
 RUN npx prisma generate
 
 # Run migrations and seed the database during the build
+RUN touch prisma/database.db
 RUN npx prisma migrate deploy
 RUN npx prisma db seed
 
