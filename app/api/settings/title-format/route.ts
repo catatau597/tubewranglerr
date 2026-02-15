@@ -51,10 +51,14 @@ export async function POST(req: Request) {
     
     const value = JSON.stringify(body);
 
+    // Usando upsert para criar ou atualizar a configuração
     await prisma.config.upsert({
       where: { key: CONFIG_KEY },
       update: { value },
-      create: { key: CONFIG_KEY, value },
+      create: { 
+        key: CONFIG_KEY, 
+        value: value,
+      },
     });
 
     return NextResponse.json({ message: 'Configuração salva com sucesso.' });

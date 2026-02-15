@@ -2,15 +2,35 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { getConfig } from '@/lib/config';
 import { TitleComponent } from '@/app/(dashboard)/settings/title-format/page';
-import { Stream } from '@prisma/client';
+// Não usar o tipo Stream do Prisma, pois não inclui o campo channel
+
 
 interface TitleFormatConfig {
   components: TitleComponent[];
   useBrackets: boolean;
 }
 
+interface StreamWithChannel {
+  videoId: string;
+  channelId: string;
+  channel: {
+    id: string;
+    title: string;
+    thumbnailUrl?: string | null;
+  };
+  title: string;
+  description?: string | null;
+  status: string;
+  thumbnailUrl?: string | null;
+  watchUrl: string;
+  scheduledStart?: Date | null;
+  actualStart?: Date | null;
+  actualEnd?: Date | null;
+  durationISO?: string | null;
+}
+
 // Função auxiliar para gerar o título formatado
-const generateDisplayTitle = (stream: Stream, channelTitle: string, config: TitleFormatConfig): string => {
+const generateDisplayTitle = (stream: StreamWithChannel, channelTitle: string, config: TitleFormatConfig): string => {
   const example: Record<string, string> = {
     status: stream.status === 'live' ? 'AO VIVO' : (stream.status === 'upcoming' ? 'AGENDADO' : 'GRAVADO'),
     channelName: channelTitle,
@@ -36,7 +56,7 @@ export async function GET(
   { params }: { params: { filename: string } }
 ) {
   const { filename } = params;
-  let streams: Stream[] = [];
+  let streams: StreamWithChannel[] = [];
   
   // 1. Determina o tipo de playlist a partir do nome do arquivo
   if (filename.includes('live')) {
@@ -61,14 +81,14 @@ export async function GET(
   // 3. Gera o conteúdo do M3U
   const m3uLines = ['#EXTM3U'];
   for (const stream of streams) {
-    const displayTitle = generateDisplayTitle(stream, stream.channel.title, titleConfig);
+    const channel = stream.channel;
+    const displayTitle = generateDisplayTitle(stream, channel.title, titleConfig);
     const proxyUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stream/${stream.videoId}`;
-    
-    m3uLines.push(`#EXTINF:-1 tvg-id="${stream.channel.id}" tvg-name="${stream.channel.title}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${stream.channel.title}",${displayTitle}`);
+    m3uLines.push(`#EXTINF:-1 tvg-id="${channel.id}" tvg-name="${channel.title}" tvg-logo="${channel.thumbnailUrl || ''}" group-title="${channel.title}",${displayTitle}`);
     m3uLines.push(proxyUrl);
   }
 
-  const m3uContent = m3uLines.join('\\n');
+  const m3uContent = m3uLines.join('\n');
   
   return new NextResponse(m3uContent, {
     headers: {
