@@ -14,6 +14,7 @@ export class PlayerHealthMonitor {
   private restarts = 0;
   private monitorTimer: NodeJS.Timeout | null = null;
   private stopped = false;
+  private restarting = false;
 
   constructor(options: HealthMonitorOptions = {}) {
     this.monitorInterval = options.monitorInterval ?? 5000;
@@ -23,23 +24,11 @@ export class PlayerHealthMonitor {
 
   async attach(
     streamId: string,
+    initialProcess: ChildProcessWithoutNullStreams,
     processFactory: () => ChildProcessWithoutNullStreams,
     onProcess: (process: ChildProcessWithoutNullStreams) => void,
   ) {
-    let current = processFactory();
-    onProcess(current);
-
-    const restart = async () => {
-      if (this.stopped || this.restarts >= this.maxRestarts) return;
-      this.restarts += 1;
-      const backoff = this.baseBackoffMs * 2 ** (this.restarts - 1);
-      await logEvent('WARN', 'SmartPlayer', 'Process unhealthy, restarting', { streamId, attempt: this.restarts, backoff });
-      await new Promise((r) => setTimeout(r, backoff));
-      if (this.stopped) return;
-      current = processFactory();
-      onProcess(current);
-      bind(current);
-    };
+    let current = initialProcess;
 
     const bind = (proc: ChildProcessWithoutNullStreams) => {
       proc.on('exit', (code) => {
@@ -52,6 +41,35 @@ export class PlayerHealthMonitor {
       });
     };
 
+    const restart = async () => {
+      if (this.stopped || this.restarts >= this.maxRestarts || this.restarting) return;
+      this.restarting = true;
+      this.restarts += 1;
+
+      const backoff = this.baseBackoffMs * 2 ** (this.restarts - 1);
+      await logEvent('WARN', 'SmartPlayer', 'Process unhealthy, restarting', {
+        streamId,
+        attempt: this.restarts,
+        backoff,
+      });
+
+      await new Promise((r) => setTimeout(r, backoff));
+      if (this.stopped) {
+        this.restarting = false;
+        return;
+      }
+
+      if (!current.killed) {
+        current.kill('SIGTERM');
+      }
+
+      current = processFactory();
+      onProcess(current);
+      bind(current);
+      this.restarting = false;
+    };
+
+    onProcess(current);
     bind(current);
 
     this.monitorTimer = setInterval(async () => {
