@@ -1,0 +1,316 @@
+diff --git a/app/(dashboard)/playlists/page.tsx b/app/(dashboard)/playlists/page.tsx
+index 6f2c634..0700c05 100644
+--- a/app/(dashboard)/playlists/page.tsx
++++ b/app/(dashboard)/playlists/page.tsx
+@@ -16,32 +16,25 @@ export default function PlaylistsPage() {
+   const [playlistUpcoming, setPlaylistUpcoming] = useState('playlist_upcoming.m3u8');
+   const [playlistVod, setPlaylistVod] = useState('playlist_vod.m3u8');
+   const [epgFile, setEpgFile] = useState('youtube_epg.xml');
+-  const [appUrl, setAppUrl] = useState('');
+ 
+   useEffect(() => {
+-    // Busca configs do servidor para obter os nomes dos arquivos e a URL base
+     const fetchConfigs = async () => {
+-      // A URL base agora vem de uma config para ser consistente
+-      // Em um ambiente de produção, esta seria a URL pública do seu servidor
+-      // Vou usar a localização da janela como um fallback para desenvolvimento
+-      const res = await fetch('/api/config/public'); // Um endpoint hipotético para configs públicas
++      const res = await fetch('/api/config/public');
+       if (res.ok) {
+         const data = await res.json();
+-        setAppUrl(data.TUBEWRANGLERR_URL || window.location.origin);
++        const resolvedUrl = data.TUBEWRANGLERR_URL || window.location.origin;
++        setBaseUrl(resolvedUrl);
+         setPlaylistLive(data.PLAYLIST_LIVE_FILENAME || 'playlist_live.m3u8');
+         setPlaylistUpcoming(data.PLAYLIST_UPCOMING_FILENAME || 'playlist_upcoming.m3u8');
+         setPlaylistVod(data.PLAYLIST_VOD_FILENAME || 'playlist_vod.m3u8');
+         setEpgFile(data.XMLTV_FILENAME || 'youtube_epg.xml');
+       } else {
+-         setAppUrl(window.location.origin);
++        setBaseUrl(window.location.origin);
+       }
+-       setBaseUrl(appUrl);
+     };
+-    
+-    // fetchConfigs(); // Desabilitado por enquanto para evitar criar outra API
+-    setBaseUrl(window.location.origin);
+ 
+-  }, [appUrl]);
++    fetchConfigs();
++  }, []);
+ 
+   const fullPlaylistLiveUrl = `${baseUrl}/api/playlist/${playlistLive}`;
+   const fullPlaylistUpcomingUrl = `${baseUrl}/api/playlist/${playlistUpcoming}`;
+diff --git a/app/api/channels/[id]/sync/route.ts b/app/api/channels/[id]/sync/route.ts
+new file mode 100644
+index 0000000..6c6f6df
+--- /dev/null
++++ b/app/api/channels/[id]/sync/route.ts
+@@ -0,0 +1,32 @@
++import { NextResponse } from 'next/server';
++import { syncStreamsForChannel } from '@/lib/services/youtube';
++
++export const dynamic = 'force-dynamic';
++
++export async function POST(
++  _request: Request,
++  { params }: { params: Promise<{ id: string }> }
++) {
++  try {
++    const { id: channelId } = await params;
++
++    if (!channelId) {
++      return NextResponse.json({ success: false, error: 'ID do canal obrigatório.' }, { status: 400 });
++    }
++
++    const result = await syncStreamsForChannel(channelId);
++
++    return NextResponse.json({
++      success: true,
++      message: 'Sincronização do canal concluída com sucesso.',
++      newStreams: result.newCount,
++      updatedStreams: result.updatedCount,
++    });
++  } catch (error) {
++    console.error('Erro ao sincronizar canal:', error);
++    return NextResponse.json(
++      { success: false, error: 'Erro ao sincronizar canal.' },
++      { status: 500 }
++    );
++  }
++}
+diff --git a/app/api/config/public/route.ts b/app/api/config/public/route.ts
+new file mode 100644
+index 0000000..bac5dce
+--- /dev/null
++++ b/app/api/config/public/route.ts
+@@ -0,0 +1,26 @@
++import { NextResponse } from 'next/server';
++import prisma from '@/lib/db';
++
++export const dynamic = 'force-dynamic';
++
++const PUBLIC_CONFIG_KEYS = [
++  'TUBEWRANGLERR_URL',
++  'PLAYLIST_LIVE_FILENAME',
++  'PLAYLIST_UPCOMING_FILENAME',
++  'PLAYLIST_VOD_FILENAME',
++  'XMLTV_FILENAME',
++] as const;
++
++export async function GET() {
++  try {
++    const configs = await prisma.config.findMany({
++      where: { key: { in: [...PUBLIC_CONFIG_KEYS] } },
++    });
++
++    const response = Object.fromEntries(configs.map((c) => [c.key, c.value]));
++    return NextResponse.json(response);
++  } catch (error) {
++    console.error('Erro ao buscar configurações públicas:', error);
++    return NextResponse.json({ error: 'Erro ao buscar configurações públicas.' }, { status: 500 });
++  }
++}
+diff --git a/app/api/stream/[id]/route.ts b/app/api/stream/[id]/route.ts
+index ecb85d8..d134c8e 100644
+--- a/app/api/stream/[id]/route.ts
++++ b/app/api/stream/[id]/route.ts
+@@ -1,27 +1,24 @@
+ import { NextRequest, NextResponse } from 'next/server';
+ import prisma from '@/lib/db';
+ import { spawn } from 'child_process';
+-import { getStreamUrl } from '@/lib/player/router'; // To be implemented
+ 
+-// Dynamic Route Handler for Smart Player Proxy
++export const dynamic = 'force-dynamic';
++
+ export async function GET(
+   request: NextRequest,
+   { params }: { params: Promise<{ id: string }> }
+ ) {
+   const { id: videoId } = await params;
+-  
+-  // 1. Fetch Stream Status from DB
++
+   const stream = await prisma.stream.findUnique({
+     where: { videoId },
+-    select: { status: true, watchUrl: true, thumbnailUrl: true }
++    select: { status: true, watchUrl: true, thumbnailUrl: true },
+   });
+ 
+   if (!stream) {
+     return new NextResponse('Stream not found', { status: 404 });
+   }
+ 
+-  // 2. Determine Source based on Status
+-  // Logic from smart_player.py ported here
+   let processArgs: string[] = [];
+   let command = '';
+ 
+@@ -32,34 +29,56 @@ export async function GET(
+     command = 'yt-dlp';
+     processArgs = ['-o', '-', stream.watchUrl];
+   } else {
+-    // Upcoming/Placeholder logic (FFmpeg loop)
+     command = 'ffmpeg';
+-    processArgs = [
+-      '-re', '-i', stream.thumbnailUrl || 'placeholder.jpg',
+-      '-f', 'mpegts', '-'
+-      // ... full ffmpeg args for looping image
+-    ];
++    processArgs = ['-re', '-i', stream.thumbnailUrl || 'placeholder.jpg', '-f', 'mpegts', '-'];
+   }
+ 
+-  // 3. Spawn Process and Pipe
+-  const child = spawn(command, processArgs);
++  const child = spawn(command, processArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
++
++  const timeoutId = setTimeout(() => {
++    if (!child.killed) child.kill('SIGKILL');
++  }, 1000 * 60 * 10);
++
++  request.signal.addEventListener('abort', () => {
++    if (!child.killed) child.kill('SIGTERM');
++    clearTimeout(timeoutId);
++  });
+ 
+-  // Create a ReadableStream from the child process stdout
+   const streamData = new ReadableStream({
+     start(controller) {
+       child.stdout.on('data', (chunk) => controller.enqueue(chunk));
+-      child.stdout.on('end', () => controller.close());
+-      child.stderr.on('data', (err) => console.error(`[${command}]`, err.toString()));
++
++      child.stdout.on('end', () => {
++        clearTimeout(timeoutId);
++        controller.close();
++      });
++
++      child.on('error', (err) => {
++        console.error(`[${command}] spawn error:`, err);
++        clearTimeout(timeoutId);
++        controller.error(err);
++      });
++
++      child.stderr.on('data', (err) => {
++        console.error(`[${command}]`, err.toString());
++      });
++
++      child.on('exit', (code) => {
++        if (code && code !== 0) {
++          console.error(`[${command}] exited with code ${code}`);
++        }
++      });
+     },
+     cancel() {
+-      child.kill();
+-    }
++      clearTimeout(timeoutId);
++      if (!child.killed) child.kill('SIGTERM');
++    },
+   });
+ 
+   return new NextResponse(streamData, {
+     headers: {
+       'Content-Type': 'video/mp2t',
+-      'Cache-Control': 'no-cache'
+-    }
++      'Cache-Control': 'no-cache',
++    },
+   });
+ }
+diff --git a/app/layout.tsx b/app/layout.tsx
+index 17711ba..91bbfe2 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -1,9 +1,6 @@
+ import type { Metadata } from "next";
+-import { Inter } from "next/font/google";
+ import "./globals.css";
+ 
+-const inter = Inter({ subsets: ["latin"] });
+-
+ export const metadata: Metadata = {
+   title: "TubeWranglerr",
+   description: "YouTube Stream Aggregator",
+@@ -16,7 +13,7 @@ export default function RootLayout({
+ }>) {
+   return (
+     <html lang="en">
+-      <body className={inter.className}>{children}</body>
++      <body>{children}</body>
+     </html>
+   );
+ }
+diff --git a/eslint.config.mjs b/eslint.config.mjs
+new file mode 100644
+index 0000000..bb4ad49
+--- /dev/null
++++ b/eslint.config.mjs
+@@ -0,0 +1,5 @@
++import nextVitals from 'eslint-config-next/core-web-vitals';
++
++const config = [...nextVitals];
++
++export default config;
+diff --git a/lib/config-metadata.ts b/lib/config-metadata.ts
+index 69448f6..ae56d09 100644
+--- a/lib/config-metadata.ts
++++ b/lib/config-metadata.ts
+@@ -39,6 +39,7 @@ export const CONFIG_METADATA: Record<string, { type: string, category: string, d
+   'RECORDED_RETENTION_DAYS': { type: 'int', category: 'Retenção (VOD)', description: 'Por quantos dias manter um VOD antes de deletar.' },
+ 
+   // Categoria 6: Arquivos de Saída
++  'TUBEWRANGLERR_URL': { type: 'string', category: 'Arquivos de Saída', description: 'URL pública base do serviço para geração de links absolutos.' },
+   'PLAYLIST_LIVE_FILENAME': { type: 'string', category: 'Arquivos de Saída', description: 'Nome do arquivo da playlist de lives (ex: live.m3u8).' },
+   'PLAYLIST_UPCOMING_FILENAME': { type: 'string', category: 'Arquivos de Saída', description: 'Nome do arquivo da playlist de agendados (ex: upcoming.m3u8).' },
+   'PLAYLIST_VOD_FILENAME': { type: 'string', category: 'Arquivos de Saída', description: 'Nome do arquivo da playlist de VODs (ex: vod.m3u8).' },
+diff --git a/lib/services/youtube.ts b/lib/services/youtube.ts
+index b8a07f1..d662d95 100644
+--- a/lib/services/youtube.ts
++++ b/lib/services/youtube.ts
+@@ -1,7 +1,6 @@
+ import { google } from 'googleapis';
+ import prisma from '@/lib/db';
+-import { getConfig, getListConfig, getIntConfig, getBoolConfig } from '@/lib/config';
+-import { addHours, isAfter, isBefore } from 'date-fns';
++import { getConfig, getListConfig, getBoolConfig } from '@/lib/config';
+ 
+ const youtube = google.youtube('v3');
+ 
+@@ -336,13 +335,20 @@ export async function syncStreamsForChannel(channelId: string) {
+ 
+         await prisma.stream.upsert({
+           where: { videoId: item.id },
+-          update: { /* ... (dados de update) ... */ 
++          update: {
+             title: item.snippet.title || '',
++            description: item.snippet.description || '',
+             status: finalStatus,
++            thumbnailUrl: item.snippet.thumbnails?.maxres?.url || item.snippet.thumbnails?.high?.url,
++            watchUrl: `https://www.youtube.com/watch?v=${item.id}`,
+             scheduledStart, actualStart, actualEnd,
++            durationISO: item.contentDetails?.duration,
++            categoryYoutube: categoryId,
++            tags: JSON.stringify(item.snippet.tags || []),
++            isAgeRestricted: item.contentDetails?.contentRating?.ytRating === 'ytAgeRestricted',
+             lastSeen: new Date()
+           },
+-          create: { /* ... (dados de create) ... */
++          create: {
+             videoId: item.id,
+             channelId: item.snippet.channelId!,
+             title: item.snippet.title || '',
+diff --git a/package.json b/package.json
+index 86a89fb..ba19ba5 100644
+--- a/package.json
++++ b/package.json
+@@ -10,7 +10,7 @@
+     "dev": "next dev --turbo",
+     "build": "next build",
+     "start": "next start",
+-    "lint": "next lint"
++    "lint": "eslint ."
+   },
+   "prisma": {
+     "seed": "tsx prisma/seed.ts"
