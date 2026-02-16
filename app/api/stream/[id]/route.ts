@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { routeProcess, StreamForRouting } from '@/lib/player/router';
+import { canUseBinaryRoute, getRequiredBinary, getSmartPlayerMode } from '@/lib/player/capabilities';
 import { PlayerHealthMonitor } from '@/lib/player/health-monitor';
 import { getBoolConfig } from '@/lib/config';
 import { logEvent } from '@/lib/observability';
@@ -42,6 +43,39 @@ export async function GET(
     scheduledStart: stream.scheduledStart,
   };
 
+  const mode = getSmartPlayerMode();
+  const canUseBinary = canUseBinaryRoute(streamForRouting);
+  const requiredBinary = getRequiredBinary(streamForRouting);
+
+  if (mode === 'redirect' || (mode === 'auto' && !canUseBinary)) {
+    await logEvent('WARN', 'SmartPlayer', 'Using redirect fallback', {
+      videoId,
+      status: stream.status,
+      mode,
+      requiredBinary,
+    });
+
+    return NextResponse.redirect(stream.watchUrl, {
+      status: 302,
+      headers: {
+        'x-smart-player-mode': 'redirect',
+      },
+    });
+  }
+
+  if (mode === 'binary' && !canUseBinary) {
+    await logEvent('ERROR', 'SmartPlayer', 'Required binary unavailable in binary mode', {
+      videoId,
+      status: stream.status,
+      requiredBinary,
+    });
+
+    return NextResponse.json(
+      { error: `Required binary not available: ${requiredBinary}` },
+      { status: 503, headers: { 'x-smart-player-mode': 'binary-unavailable' } }
+    );
+  }
+
   const enableAnalytics = await getBoolConfig('PROXY_ENABLE_ANALYTICS', true);
   if (enableAnalytics) {
     await logEvent('INFO', 'SmartPlayer', 'Proxy access', { videoId, status: stream.status });
@@ -49,14 +83,6 @@ export async function GET(
 
   let child = routeProcess(streamForRouting);
   const monitor = new PlayerHealthMonitor({ monitorInterval: 5000, maxRestarts: 3, baseBackoffMs: 750 });
-
-  await monitor.attach(
-    videoId,
-    () => routeProcess(streamForRouting),
-    (proc) => {
-      child = proc;
-    }
-  );
 
   const timeoutId = setTimeout(() => {
     if (!child.killed) child.kill('SIGKILL');
@@ -69,26 +95,38 @@ export async function GET(
     monitor.stop();
   });
 
-  const streamData = new ReadableStream({
+  let controllerRef: ReadableStreamDefaultController<Uint8Array> | null = null;
+
+  const bindProcess = (proc: typeof child) => {
+    proc.stdout.on('data', (chunk: Buffer) => controllerRef?.enqueue(chunk));
+
+    proc.stdout.on('end', () => {
+      if (proc !== child) return;
+      clearTimeout(timeoutId);
+      monitor.stop();
+      controllerRef?.close();
+    });
+
+    proc.on('error', async (err) => {
+      await logEvent('ERROR', 'SmartPlayer', 'Spawn error', { videoId, error: err.message });
+      clearTimeout(timeoutId);
+      monitor.stop();
+      controllerRef?.error(err);
+    });
+
+    proc.stderr.on('data', (err) => {
+      console.error(`[smart-player:${videoId}]`, err.toString());
+    });
+  };
+
+  await monitor.attach(videoId, child, () => routeProcess(streamForRouting), (proc) => {
+    child = proc;
+    bindProcess(proc);
+  });
+
+  const streamData = new ReadableStream<Uint8Array>({
     start(controller) {
-      child.stdout.on('data', (chunk) => controller.enqueue(chunk));
-
-      child.stdout.on('end', () => {
-        clearTimeout(timeoutId);
-        monitor.stop();
-        controller.close();
-      });
-
-      child.on('error', async (err) => {
-        await logEvent('ERROR', 'SmartPlayer', 'Spawn error', { videoId, error: err.message });
-        clearTimeout(timeoutId);
-        monitor.stop();
-        controller.error(err);
-      });
-
-      child.stderr.on('data', (err) => {
-        console.error(`[smart-player:${videoId}]`, err.toString());
-      });
+      controllerRef = controller;
     },
     cancel() {
       clearTimeout(timeoutId);
@@ -101,6 +139,7 @@ export async function GET(
     headers: {
       'Content-Type': 'video/mp2t',
       'Cache-Control': 'no-cache',
+      'x-smart-player-mode': 'binary',
     },
   });
 }
