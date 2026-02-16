@@ -1,7 +1,15 @@
 import prisma from '@/lib/db';
 import { randomUUID } from 'crypto';
+import { getConfig } from '@/lib/config';
 
-export type LogLevel = 'INFO' | 'WARN' | 'ERROR';
+export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+
+const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
+  DEBUG: 0,
+  INFO: 1,
+  WARN: 2,
+  ERROR: 3,
+};
 
 export interface LogContext {
   requestId?: string;
@@ -23,25 +31,39 @@ export function getRequestId(req?: Request): string {
 }
 
 export async function logEvent(level: LogLevel, component: string, message: string, context?: LogContext) {
+  const globalLevel = (await getConfig('LOG_LEVEL', 'INFO')) as LogLevel;
+  const smartPlayerLevel = (await getConfig('SMART_PLAYER_LOG_LEVEL', 'INFO')) as LogLevel;
+
+  const currentLevel = component === 'SmartPlayer' ? smartPlayerLevel : globalLevel;
+  
+  if (LOG_LEVEL_PRIORITY[level] < LOG_LEVEL_PRIORITY[currentLevel]) {
+    return;
+  }
+
   const line = `[${level}] [${component}] ${message}${serializeContext(context)}`;
 
   if (level === 'ERROR') {
     console.error(line);
   } else if (level === 'WARN') {
     console.warn(line);
-  } else {
+  } else if (level === 'INFO') {
     console.log(line);
+  } else {
+    console.debug(line);
   }
 
-  try {
-    await prisma.log.create({
-      data: {
-        level,
-        component,
-        message: `${message}${serializeContext(context)}`,
-      },
-    });
-  } catch {
-    // best-effort persistence
+  const logToFile = await getConfig('LOG_TO_FILE', 'true');
+  if (logToFile === 'true') {
+    try {
+      await prisma.log.create({
+        data: {
+          level,
+          component,
+          message: `${message}${serializeContext(context)}`,
+        },
+      });
+    } catch {
+      // best-effort persistence
+    }
   }
 }
