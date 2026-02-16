@@ -6,9 +6,9 @@ import { getStreamUrl } from '@/lib/player/router'; // To be implemented
 // Dynamic Route Handler for Smart Player Proxy
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const videoId = params.id;
+  const { id: videoId } = await params;
   
   // 1. Fetch Stream Status from DB
   const stream = await prisma.stream.findUnique({

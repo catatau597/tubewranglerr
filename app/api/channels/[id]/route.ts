@@ -5,10 +5,10 @@ export const dynamic = 'force-dynamic';
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const channelId = params.id; // Pega o ID dos parâmetros da URL
+    const { id: channelId } = await params; // Pega o ID dos parâmetros da URL
     const body = await request.json();
     const { isActive } = body;
 
@@ -30,10 +30,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const channelId = params.id; // Pega o ID dos parâmetros da URL
+    const { id: channelId } = await params; // Pega o ID dos parâmetros da URL
 
     if (!channelId) {
       return NextResponse.json({ error: 'ID do canal obrigatório' }, { status: 400 });

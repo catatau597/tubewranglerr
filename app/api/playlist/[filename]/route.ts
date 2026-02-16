@@ -53,9 +53,9 @@ const generateDisplayTitle = (stream: StreamWithChannel, channelTitle: string, c
 
 export async function GET(
   req: Request,
-  { params }: { params: { filename: string } }
+  { params }: { params: Promise<{ filename: string }> }
 ) {
-  const { filename } = params;
+  const { filename } = await params;
   let streams: StreamWithChannel[] = [];
   
   // 1. Determina o tipo de playlist a partir do nome do arquivo

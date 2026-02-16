@@ -12,8 +12,25 @@ async function main() {
 
   // 1. Popular Configurações a partir dos Metadados
   for (const [key, meta] of Object.entries(CONFIG_METADATA)) {
-    // Usar valor da variável de ambiente se existir, senão um padrão vazio
-    const value = process.env[key] || ''
+    // Usar valor da variável de ambiente se existir
+    let value = process.env[key] || ''
+
+    // Se não houver valor no .env e for do tipo json, define um default válido
+    if (!value && meta.type === 'json') {
+      if (key === 'TITLE_FORMAT_CONFIG') {
+        value = JSON.stringify({
+          components: [
+            { id: 'status', label: '[STATUS]', enabled: true },
+            { id: 'channelName', label: '[NOME DO CANAL]', enabled: true },
+            { id: 'eventName', label: '[NOME DO EVENTO]', enabled: true },
+            { id: 'dateTime', label: '[DATA E HORA]', enabled: false },
+          ],
+          useBrackets: true
+        });
+      } else {
+        value = '{}';
+      }
+    }
     
     await prisma.config.upsert({
       where: { key },
