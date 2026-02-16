@@ -133,7 +133,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
   const categoryMappings = parseMappingConfig(categoryMappingsStr);
   const channelMappings = parseMappingConfig(channelMappingsStr);
 
-  const mode: 'direct' | 'proxy' = filename.includes('_direct.') ? 'direct' : 'proxy';
+  const mode: 'direct' | 'proxy' = filename.includes('_direct') ? 'direct' : 'proxy';
 
   const liveDirectFilename = appendSuffix(liveFilename, 'direct');
   const liveProxyFilename = appendSuffix(liveFilename, 'proxy');

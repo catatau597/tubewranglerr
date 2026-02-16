@@ -49,7 +49,8 @@ export async function logEvent(level: LogLevel, component: string, message: stri
   } else if (level === 'INFO') {
     console.log(line);
   } else {
-    console.debug(line);
+    // Force DEBUG logs to stdout as well to ensure visibility in docker logs
+    console.log(line);
   }
 
   const logToFile = await getConfig('LOG_TO_FILE', 'true');
