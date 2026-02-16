@@ -58,6 +58,37 @@ function parseMappingConfig(value: string): Record<string, string> {
   return result;
 }
 
+function formatDateTimeShort(dateInput: Date | string | null | undefined): string {
+  if (!dateInput) return '';
+  const date = new Date(dateInput);
+  if (isNaN(date.getTime())) return '';
+  
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  
+  return `${day}/${month} ${hours}:${minutes}`;
+}
+
+function cleanTitle(title: string, filters: string[]): string {
+    let cleaned = title;
+    
+    for (const filter of filters) {
+        if (!filter) continue;
+        const escapedFilter = filter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escapedFilter, 'gi');
+        cleaned = cleaned.replace(regex, '');
+    }
+    
+    cleaned = cleaned
+        .replace(/[|]/g, ' - ')
+        .replace(/\s+/g, ' ')
+        .trim();
+        
+    return cleaned;
+}
+
 function appendSuffix(filename: string, suffix: 'direct' | 'proxy') {
   if (filename.endsWith('.m3u8')) {
     return filename.replace('.m3u8', `_${suffix}.m3u8`);
@@ -72,12 +103,15 @@ const generateDisplayTitle = (
   statusLabel: string,
   includeStatus: boolean,
   includeChannelName: boolean,
+  titleFilters: string[] = []
 ) => {
+  const cleanedEventName = cleanTitle(stream.title, titleFilters);
+
   const example: Record<string, string> = {
     status: statusLabel,
     channelName: channelTitle,
-    eventName: stream.title,
-    dateTime: stream.scheduledStart ? new Date(stream.scheduledStart).toLocaleString('pt-BR') : '',
+    eventName: cleanedEventName,
+    dateTime: formatDateTimeShort(stream.scheduledStart),
     youtubePlaylist: 'N/A',
   };
 
@@ -114,6 +148,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     channelMappingsStr,
     prefixWithStatus,
     prefixWithChannel,
+    titleFilterExpressionsStr,
   ] = await Promise.all([
     getConfig('PLAYLIST_LIVE_FILENAME', 'playlist_live.m3u8'),
     getConfig('PLAYLIST_UPCOMING_FILENAME', 'playlist_upcoming.m3u8'),
@@ -129,14 +164,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     getConfig('CHANNEL_NAME_MAPPINGS'),
     getBoolConfig('PREFIX_TITLE_WITH_STATUS', true),
     getBoolConfig('PREFIX_TITLE_WITH_CHANNEL_NAME', true),
+    getConfig('TITLE_FILTER_EXPRESSIONS', ''),
   ]);
 
   const categoryMappings = parseMappingConfig(categoryMappingsStr);
   const channelMappings = parseMappingConfig(channelMappingsStr);
+  const titleFilters = titleFilterExpressionsStr ? titleFilterExpressionsStr.split(',').map(s => s.trim()).filter(Boolean) : [];
 
   const mode: 'direct' | 'proxy' = filename.includes('_direct') ? 'direct' : 'proxy';
 
-  await logEvent('DEBUG', 'Playlist', `Generating playlist: ${filename}`, { mode });
+  await logEvent('DEBUG', 'Playlist', `Generating playlist: ${filename}`, { mode, filters: titleFilters });
 
   const liveDirectFilename = appendSuffix(liveFilename, 'direct');
   const liveProxyFilename = appendSuffix(liveFilename, 'proxy');
@@ -230,6 +267,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     const mappedChannelName = channelMappings[stream.channel.title] || stream.channel.customName || stream.channel.title;
     const statusLabel = stream.status === 'live' ? 'LIVE 🔴' : stream.status === 'upcoming' ? 'AGENDADO' : 'GRAVADO';
     const groupTitle = stream.categoryYoutube ? categoryMappings[stream.categoryYoutube] || mappedChannelName : mappedChannelName;
+    
+    // Log category for debugging mapping issues
+    await logEvent('DEBUG', 'Playlist', `Processing stream: ${stream.title}`, { categoryId: stream.categoryYoutube, groupTitle });
+
     const displayTitle = generateDisplayTitle(
       stream,
       mappedChannelName,
@@ -237,11 +278,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
       statusLabel,
       prefixWithStatus,
       prefixWithChannel,
+      titleFilters
     );
 
     const outputUrl = mode === 'direct' ? stream.watchUrl : `${appBaseUrl}/api/stream/${stream.videoId}`;
 
-    await logEvent('DEBUG', 'Playlist', `Adding stream: ${stream.title}`, { outputUrl, mode });
+    await logEvent('DEBUG', 'Playlist', `Stream added to M3U`, { displayTitle, outputUrl });
 
     m3uLines.push(
       `#EXTINF:-1 tvg-id="${stream.channel.id}" tvg-name="${mappedChannelName}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${groupTitle}",${displayTitle}`,
