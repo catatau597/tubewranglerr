@@ -1,27 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { spawn } from 'child_process';
-import { getStreamUrl } from '@/lib/player/router'; // To be implemented
 
-// Dynamic Route Handler for Smart Player Proxy
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: videoId } = await params;
-  
-  // 1. Fetch Stream Status from DB
+
   const stream = await prisma.stream.findUnique({
     where: { videoId },
-    select: { status: true, watchUrl: true, thumbnailUrl: true }
+    select: { status: true, watchUrl: true, thumbnailUrl: true },
   });
 
   if (!stream) {
     return new NextResponse('Stream not found', { status: 404 });
   }
 
-  // 2. Determine Source based on Status
-  // Logic from smart_player.py ported here
   let processArgs: string[] = [];
   let command = '';
 
@@ -32,34 +29,56 @@ export async function GET(
     command = 'yt-dlp';
     processArgs = ['-o', '-', stream.watchUrl];
   } else {
-    // Upcoming/Placeholder logic (FFmpeg loop)
     command = 'ffmpeg';
-    processArgs = [
-      '-re', '-i', stream.thumbnailUrl || 'placeholder.jpg',
-      '-f', 'mpegts', '-'
-      // ... full ffmpeg args for looping image
-    ];
+    processArgs = ['-re', '-i', stream.thumbnailUrl || 'placeholder.jpg', '-f', 'mpegts', '-'];
   }
 
-  // 3. Spawn Process and Pipe
-  const child = spawn(command, processArgs);
+  const child = spawn(command, processArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
 
-  // Create a ReadableStream from the child process stdout
+  const timeoutId = setTimeout(() => {
+    if (!child.killed) child.kill('SIGKILL');
+  }, 1000 * 60 * 10);
+
+  request.signal.addEventListener('abort', () => {
+    if (!child.killed) child.kill('SIGTERM');
+    clearTimeout(timeoutId);
+  });
+
   const streamData = new ReadableStream({
     start(controller) {
       child.stdout.on('data', (chunk) => controller.enqueue(chunk));
-      child.stdout.on('end', () => controller.close());
-      child.stderr.on('data', (err) => console.error(`[${command}]`, err.toString()));
+
+      child.stdout.on('end', () => {
+        clearTimeout(timeoutId);
+        controller.close();
+      });
+
+      child.on('error', (err) => {
+        console.error(`[${command}] spawn error:`, err);
+        clearTimeout(timeoutId);
+        controller.error(err);
+      });
+
+      child.stderr.on('data', (err) => {
+        console.error(`[${command}]`, err.toString());
+      });
+
+      child.on('exit', (code) => {
+        if (code && code !== 0) {
+          console.error(`[${command}] exited with code ${code}`);
+        }
+      });
     },
     cancel() {
-      child.kill();
-    }
+      clearTimeout(timeoutId);
+      if (!child.killed) child.kill('SIGTERM');
+    },
   });
 
   return new NextResponse(streamData, {
     headers: {
       'Content-Type': 'video/mp2t',
-      'Cache-Control': 'no-cache'
-    }
+      'Cache-Control': 'no-cache',
+    },
   });
 }

@@ -10,7 +10,8 @@
     "dev": "next dev --turbo",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint .",
+    "test": "tsx --test test/**/*.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

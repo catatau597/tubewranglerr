@@ -16,32 +16,25 @@ export default function PlaylistsPage() {
   const [playlistUpcoming, setPlaylistUpcoming] = useState('playlist_upcoming.m3u8');
   const [playlistVod, setPlaylistVod] = useState('playlist_vod.m3u8');
   const [epgFile, setEpgFile] = useState('youtube_epg.xml');
-  const [appUrl, setAppUrl] = useState('');
 
   useEffect(() => {
-    // Busca configs do servidor para obter os nomes dos arquivos e a URL base
     const fetchConfigs = async () => {
-      // A URL base agora vem de uma config para ser consistente
-      // Em um ambiente de produção, esta seria a URL pública do seu servidor
-      // Vou usar a localização da janela como um fallback para desenvolvimento
-      const res = await fetch('/api/config/public'); // Um endpoint hipotético para configs públicas
+      const res = await fetch('/api/config/public');
       if (res.ok) {
         const data = await res.json();
-        setAppUrl(data.TUBEWRANGLERR_URL || window.location.origin);
+        const resolvedUrl = data.TUBEWRANGLERR_URL || window.location.origin;
+        setBaseUrl(resolvedUrl);
         setPlaylistLive(data.PLAYLIST_LIVE_FILENAME || 'playlist_live.m3u8');
         setPlaylistUpcoming(data.PLAYLIST_UPCOMING_FILENAME || 'playlist_upcoming.m3u8');
         setPlaylistVod(data.PLAYLIST_VOD_FILENAME || 'playlist_vod.m3u8');
         setEpgFile(data.XMLTV_FILENAME || 'youtube_epg.xml');
       } else {
-         setAppUrl(window.location.origin);
+        setBaseUrl(window.location.origin);
       }
-       setBaseUrl(appUrl);
     };
-    
-    // fetchConfigs(); // Desabilitado por enquanto para evitar criar outra API
-    setBaseUrl(window.location.origin);
 
-  }, [appUrl]);
+    fetchConfigs();
+  }, []);
 
   const fullPlaylistLiveUrl = `${baseUrl}/api/playlist/${playlistLive}`;
   const fullPlaylistUpcomingUrl = `${baseUrl}/api/playlist/${playlistUpcoming}`;
