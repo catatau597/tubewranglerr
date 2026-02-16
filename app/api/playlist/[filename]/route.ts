@@ -154,6 +154,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     prefixWithStatus,
     prefixWithChannel,
     titleFilterExpressionsStr,
+    tvgNameUseDisplayTitle,
   ] = await Promise.all([
     getConfig('PLAYLIST_LIVE_FILENAME', 'playlist_live.m3u8'),
     getConfig('PLAYLIST_UPCOMING_FILENAME', 'playlist_upcoming.m3u8'),
@@ -170,6 +171,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     getBoolConfig('PREFIX_TITLE_WITH_STATUS', true),
     getBoolConfig('PREFIX_TITLE_WITH_CHANNEL_NAME', true),
     getConfig('TITLE_FILTER_EXPRESSIONS', ''),
+    getBoolConfig('TVG_NAME_USE_DISPLAY_TITLE', false),
   ]);
 
   const categoryMappings = parseMappingConfig(categoryMappingsStr);
@@ -269,13 +271,75 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
   // Use simple M3U header for channel list. DO NOT use EXT-X-TARGETDURATION which is for media segments.
   const m3uLines = ['#EXTM3U'];
 
+  // Default YouTube Category Mapping (ID -> Name)
+  const youtubeCategories: Record<string, string> = {
+    '1': 'Film & Animation',
+    '2': 'Autos & Vehicles',
+    '10': 'Music',
+    '15': 'Pets & Animals',
+    '17': 'Sports',
+    '18': 'Short Movies',
+    '19': 'Travel & Events',
+    '20': 'Gaming',
+    '21': 'Videoblogging',
+    '22': 'People & Blogs',
+    '23': 'Comedy',
+    '24': 'Entertainment',
+    '25': 'News & Politics',
+    '26': 'Howto & Style',
+    '27': 'Education',
+    '28': 'Science & Technology',
+    '29': 'Nonprofits & Activism',
+    '30': 'Movies',
+    '31': 'Anime/Animation',
+    '32': 'Action/Adventure',
+    '33': 'Classics',
+    '34': 'Comedy',
+    '35': 'Documentary',
+    '36': 'Drama',
+    '37': 'Family',
+    '38': 'Foreign',
+    '39': 'Horror',
+    '40': 'Sci-Fi/Fantasy',
+    '41': 'Thriller',
+    '42': 'Shorts',
+    '43': 'Shows',
+    '44': 'Trailers',
+  };
+
   for (const stream of streams) {
     const mappedChannelName = channelMappings[stream.channel.title] || stream.channel.customName || stream.channel.title;
     const statusLabel = stream.status === 'live' ? 'LIVE 🔴' : stream.status === 'upcoming' ? 'AGENDADO' : 'GRAVADO';
-    const groupTitle = stream.categoryYoutube ? categoryMappings[stream.categoryYoutube] || mappedChannelName : mappedChannelName;
     
+    // Resolve Category Name from ID
+    let categoryName = 'Geral';
+    if (stream.categoryYoutube && youtubeCategories[stream.categoryYoutube]) {
+      categoryName = youtubeCategories[stream.categoryYoutube];
+    }
+
+    // Determine Group Title:
+    // 1. Try mapping by ID (e.g. "17" -> "Esportes")
+    // 2. Try mapping by Name (e.g. "Sports" -> "Esportes")
+    // 3. Fallback to English Category Name (e.g. "Sports")
+    // 4. Fallback to mappedChannelName if category is unknown/missing
+    let groupTitle = mappedChannelName;
+    if (stream.categoryYoutube) {
+        // Try exact ID match first
+        if (categoryMappings[stream.categoryYoutube]) {
+            groupTitle = categoryMappings[stream.categoryYoutube];
+        } 
+        // Try Name match next (if ID resolves to a name)
+        else if (categoryName !== 'Geral' && categoryMappings[categoryName]) {
+            groupTitle = categoryMappings[categoryName];
+        }
+        // Fallback to the resolved English name (e.g. "Sports")
+        else if (categoryName !== 'Geral') {
+             groupTitle = categoryName;
+        }
+    }
+
     // Log category for debugging mapping issues
-    await logEvent('DEBUG', 'Playlist', `Processing stream: ${stream.title}`, { categoryId: stream.categoryYoutube, groupTitle });
+    await logEvent('DEBUG', 'Playlist', `Processing stream: ${stream.title}`, { categoryId: stream.categoryYoutube, categoryName, groupTitle });
 
     const displayTitle = generateDisplayTitle(
       stream,
@@ -287,13 +351,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
       titleFilters
     );
 
+    // TVG Name Logic: Use Display Title if configured, else use Channel Name
+    const tvgName = tvgNameUseDisplayTitle ? displayTitle : mappedChannelName;
+
     const outputUrl = mode === 'direct' ? stream.watchUrl : `${appBaseUrl}/api/stream/${stream.videoId}`;
 
     await logEvent('DEBUG', 'Playlist', `Stream added to M3U`, { displayTitle, outputUrl });
 
     // Use escapeAttribute to safely quote attributes
     m3uLines.push(
-      `#EXTINF:-1 tvg-id="${escapeAttribute(stream.channel.id)}" tvg-name="${escapeAttribute(mappedChannelName)}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${escapeAttribute(groupTitle)}",${displayTitle}`,
+      `#EXTINF:-1 tvg-id="${escapeAttribute(stream.channel.id)}" tvg-name="${escapeAttribute(tvgName)}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${escapeAttribute(groupTitle)}",${displayTitle}`,
     );
     m3uLines.push(outputUrl);
   }
@@ -305,12 +372,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
 
   const m3uContent = m3uLines.join('\n');
 
-  // Use .m3u and standard mime for direct mode (simple playlist), .m3u8 for proxy mode (HLS)
-  const isDirect = mode === 'direct';
-  const fileExtension = isDirect ? 'm3u' : 'm3u8';
-  // Use audio/x-mpegurl for .m3u (VLC prefers this for simple playlists)
-  // Use application/vnd.apple.mpegurl for .m3u8 (HLS)
-  const contentType = isDirect ? 'audio/x-mpegurl' : 'application/vnd.apple.mpegurl';
+  // Use .m3u and audio/x-mpegurl for ALL playlists to ensure maximum compatibility (VLC, IPTV players).
+  // Even for proxy mode (which links to HLS), a simple .m3u playlist is more widely supported as a channel list.
+  const fileExtension = 'm3u';
+  const contentType = 'audio/x-mpegurl';
   
   // Ensure filename has correct extension if not already present or replace it
   const downloadFilename = filename.replace(/\.(m3u|m3u8)$/, '') + `.${fileExtension}`;
