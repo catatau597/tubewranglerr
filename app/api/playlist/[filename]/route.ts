@@ -305,10 +305,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
 
   const m3uContent = m3uLines.join('\n');
 
+  // Use .m3u and standard mime for direct mode (simple playlist), .m3u8 for proxy mode (HLS)
+  const isDirect = mode === 'direct';
+  const fileExtension = isDirect ? 'm3u' : 'm3u8';
+  // Use audio/x-mpegurl for .m3u (VLC prefers this for simple playlists)
+  // Use application/vnd.apple.mpegurl for .m3u8 (HLS)
+  const contentType = isDirect ? 'audio/x-mpegurl' : 'application/vnd.apple.mpegurl';
+  
+  // Ensure filename has correct extension if not already present or replace it
+  const downloadFilename = filename.replace(/\.(m3u|m3u8)$/, '') + `.${fileExtension}`;
+
   return new NextResponse(m3uContent, {
     headers: {
-      'Content-Type': 'application/vnd.apple.mpegurl',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Type': contentType,
+      'Content-Disposition': `attachment; filename="${downloadFilename}"`,
     },
   });
 }
