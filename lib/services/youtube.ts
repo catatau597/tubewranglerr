@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import prisma from '@/lib/db';
 import { getConfig, getListConfig, getBoolConfig, getIntConfig } from '@/lib/config';
+import { deriveFinalStatus, shouldSkipStreamUpsert } from '@/lib/services/youtube-policy';
 
 const youtube = google.youtube('v3');
 
@@ -164,6 +165,7 @@ export async function syncStreams() {
   const usePlaylistItems = await getBoolConfig('USE_PLAYLIST_ITEMS', true);
   const filterByCategory = await getBoolConfig('FILTER_BY_CATEGORY', false);
   const allowedCategories = filterByCategory ? await getListConfig('ALLOWED_CATEGORY_IDS') : [];
+  const keepRecordedStreams = await getBoolConfig('KEEP_RECORDED_STREAMS', true);
   
   const videoIds = new Set<string>();
 
@@ -237,15 +239,7 @@ export async function syncStreams() {
         const actualStart = item.liveStreamingDetails?.actualStartTime ? new Date(item.liveStreamingDetails.actualStartTime) : null;
         const actualEnd = item.liveStreamingDetails?.actualEndTime ? new Date(item.liveStreamingDetails.actualEndTime) : null;
 
-        // Logic to determine status
-        let finalStatus = liveStatus;
-        if (liveStatus === 'live' && actualStart && !actualEnd) {
-             finalStatus = 'live';
-        } else if (liveStatus === 'upcoming') {
-             finalStatus = 'upcoming';
-        } else {
-             finalStatus = 'none'; // VOD or Ended
-        }
+        const finalStatus = deriveFinalStatus(liveStatus, actualStart, actualEnd);
 
         const channelLastSync = channels.find((c) => c.id === item.snippet.channelId)?.lastSync;
         const isFirstSyncForChannel = !channelLastSync;
@@ -258,7 +252,7 @@ export async function syncStreams() {
         }
 
         const existingStream = await prisma.stream.findUnique({ where: { videoId: item.id } });
-        if (!existingStream && finalStatus === 'none') {
+        if (shouldSkipStreamUpsert(Boolean(existingStream), finalStatus, keepRecordedStreams)) {
           continue;
         }
 
@@ -319,6 +313,7 @@ export async function syncStreamsForChannel(channelId: string) {
   const usePlaylistItems = await getBoolConfig('USE_PLAYLIST_ITEMS', true);
   const filterByCategory = await getBoolConfig('FILTER_BY_CATEGORY', false);
   const allowedCategories = filterByCategory ? await getListConfig('ALLOWED_CATEGORY_IDS') : [];
+  const keepRecordedStreams = await getBoolConfig('KEEP_RECORDED_STREAMS', true);
   
   const videoIds = new Set<string>();
 
@@ -384,11 +379,10 @@ export async function syncStreamsForChannel(channelId: string) {
         const actualStart = item.liveStreamingDetails?.actualStartTime ? new Date(item.liveStreamingDetails.actualStartTime) : null;
         const actualEnd = item.liveStreamingDetails?.actualEndTime ? new Date(item.liveStreamingDetails.actualEndTime) : null;
 
-        // Logic to determine status
-        let finalStatus = liveStatus === 'live' && actualStart && !actualEnd ? 'live' : (liveStatus === 'upcoming' ? 'upcoming' : 'none');
+        const finalStatus = deriveFinalStatus(liveStatus, actualStart, actualEnd);
 
         const existingStream = await prisma.stream.findUnique({ where: { videoId: item.id } });
-        if (!existingStream && finalStatus === 'none') {
+        if (shouldSkipStreamUpsert(Boolean(existingStream), finalStatus, keepRecordedStreams)) {
           continue;
         }
 
