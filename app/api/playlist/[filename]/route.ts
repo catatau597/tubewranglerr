@@ -89,6 +89,11 @@ function cleanTitle(title: string, filters: string[]): string {
     return cleaned;
 }
 
+function escapeAttribute(val: string): string {
+  if (!val) return '';
+  return val.replace(/"/g, '');
+}
+
 function appendSuffix(filename: string, suffix: 'direct' | 'proxy') {
   if (filename.endsWith('.m3u8')) {
     return filename.replace('.m3u8', `_${suffix}.m3u8`);
@@ -261,7 +266,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
   const origin = new URL(req.url).origin;
   const appBaseUrl = configuredBaseUrl || origin;
 
-  const m3uLines = ['#EXTM3U', '#EXT-X-VERSION:3', '#EXT-X-TARGETDURATION:10'];
+  // Use simple M3U header for channel list. DO NOT use EXT-X-TARGETDURATION which is for media segments.
+  const m3uLines = ['#EXTM3U'];
 
   for (const stream of streams) {
     const mappedChannelName = channelMappings[stream.channel.title] || stream.channel.customName || stream.channel.title;
@@ -285,8 +291,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
 
     await logEvent('DEBUG', 'Playlist', `Stream added to M3U`, { displayTitle, outputUrl });
 
+    // Use escapeAttribute to safely quote attributes
     m3uLines.push(
-      `#EXTINF:-1 tvg-id="${stream.channel.id}" tvg-name="${mappedChannelName}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${groupTitle}",${displayTitle}`,
+      `#EXTINF:-1 tvg-id="${escapeAttribute(stream.channel.id)}" tvg-name="${escapeAttribute(mappedChannelName)}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${escapeAttribute(groupTitle)}",${displayTitle}`,
     );
     m3uLines.push(outputUrl);
   }
