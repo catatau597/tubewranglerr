@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { getBoolConfig, getConfig } from '@/lib/config';
 import { TitleComponent } from '@/app/(dashboard)/settings/title-format/page';
+import { logEvent } from '@/lib/observability';
 
 interface TitleFormatConfig {
   components: TitleComponent[];
@@ -135,6 +136,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
 
   const mode: 'direct' | 'proxy' = filename.includes('_direct') ? 'direct' : 'proxy';
 
+  await logEvent('DEBUG', 'Playlist', `Generating playlist: ${filename}`, { mode });
+
   const liveDirectFilename = appendSuffix(liveFilename, 'direct');
   const liveProxyFilename = appendSuffix(liveFilename, 'proxy');
   const upcomingDirectFilename = appendSuffix(upcomingFilename, 'direct');
@@ -237,6 +240,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     );
 
     const outputUrl = mode === 'direct' ? stream.watchUrl : `${appBaseUrl}/api/stream/${stream.videoId}`;
+
+    await logEvent('DEBUG', 'Playlist', `Adding stream: ${stream.title}`, { outputUrl, mode });
 
     m3uLines.push(
       `#EXTINF:-1 tvg-id="${stream.channel.id}" tvg-name="${mappedChannelName}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${groupTitle}",${displayTitle}`,

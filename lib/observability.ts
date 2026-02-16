@@ -36,21 +36,23 @@ export async function logEvent(level: LogLevel, component: string, message: stri
 
   const currentLevel = component === 'SmartPlayer' ? smartPlayerLevel : globalLevel;
   
-  if (LOG_LEVEL_PRIORITY[level] < LOG_LEVEL_PRIORITY[currentLevel]) {
-    return;
+  // FORCE DEBUG LOGS TO CONSOLE ALWAYS FOR DIAGNOSTICS
+  const line = `[${level}] [${component}] ${message}${serializeContext(context)}`;
+  
+  // Check if we should log to console based on level OR if it is DEBUG (force)
+  if (level === 'DEBUG' || LOG_LEVEL_PRIORITY[level] >= LOG_LEVEL_PRIORITY[currentLevel]) {
+      if (level === 'ERROR') {
+        console.error(line);
+      } else if (level === 'WARN') {
+        console.warn(line);
+      } else {
+        console.log(line);
+      }
   }
 
-  const line = `[${level}] [${component}] ${message}${serializeContext(context)}`;
-
-  if (level === 'ERROR') {
-    console.error(line);
-  } else if (level === 'WARN') {
-    console.warn(line);
-  } else if (level === 'INFO') {
-    console.log(line);
-  } else {
-    // Force DEBUG logs to stdout as well to ensure visibility in docker logs
-    console.log(line);
+  // Only persist to DB if it meets the configured level to avoid flooding DB
+  if (LOG_LEVEL_PRIORITY[level] < LOG_LEVEL_PRIORITY[currentLevel]) {
+    return;
   }
 
   const logToFile = await getConfig('LOG_TO_FILE', 'true');

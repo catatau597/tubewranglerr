@@ -37,7 +37,7 @@ export async function startScheduler() {
 
   await logEvent('INFO', 'Scheduler', 'Scheduling main sync', { cronExpression });
 
-  cron.schedule(cronExpression, async () => {
+  const runSync = async () => {
     if (isJobInProgress) {
       await logEvent('WARN', 'Scheduler', 'Skipped cron execution because another run is in progress');
       return;
@@ -75,5 +75,11 @@ export async function startScheduler() {
       isJobInProgress = false;
       schedulerMetrics.inProgress = false;
     }
-  });
+  };
+
+  cron.schedule(cronExpression, runSync);
+
+  // Trigger immediate initial sync
+  await logEvent('INFO', 'Scheduler', 'Triggering immediate initial sync');
+  runSync().catch(err => console.error('Initial sync failed', err));
 }
