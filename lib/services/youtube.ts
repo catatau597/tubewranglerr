@@ -1,9 +1,45 @@
 import { google } from 'googleapis';
 import prisma from '@/lib/db';
-import { getConfig, getListConfig, getIntConfig, getBoolConfig } from '@/lib/config';
-import { addHours, isAfter, isBefore } from 'date-fns';
+import { getConfig, getListConfig, getBoolConfig, getIntConfig } from '@/lib/config';
 
 const youtube = google.youtube('v3');
+
+async function enforceRecordedPolicy() {
+  const keepRecorded = await getBoolConfig('KEEP_RECORDED_STREAMS', true);
+  const maxRecorded = await getIntConfig('MAX_RECORDED_PER_CHANNEL', 2);
+  const retentionDays = await getIntConfig('RECORDED_RETENTION_DAYS', 2);
+
+  if (!keepRecorded) {
+    await prisma.stream.deleteMany({ where: { status: 'none' } });
+    return;
+  }
+
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+  await prisma.stream.deleteMany({
+    where: {
+      status: 'none',
+      OR: [
+        { actualEnd: { lt: cutoff } },
+        { actualEnd: null, createdAt: { lt: cutoff } },
+      ],
+    },
+  });
+
+  const channels = await prisma.channel.findMany({ select: { id: true } });
+  for (const channel of channels) {
+    const recorded = await prisma.stream.findMany({
+      where: { channelId: channel.id, status: 'none' },
+      orderBy: [{ actualEnd: 'desc' }, { createdAt: 'desc' }],
+      select: { videoId: true },
+    });
+
+    if (recorded.length > maxRecorded) {
+      const toDelete = recorded.slice(maxRecorded).map((r) => r.videoId);
+      await prisma.stream.deleteMany({ where: { videoId: { in: toDelete } } });
+    }
+  }
+}
+
 
 // Variável em memória para rastrear o índice da chave de API
 let apiKeyIndex = 0;
@@ -43,11 +79,17 @@ export async function syncChannels() {
   // 1. Resolve Handles -> Channel IDs
   const resolvedIds = new Set<string>(manualIds);
 
+  const resolveTtlHours = await getIntConfig('RESOLVE_HANDLES_TTL_HOURS', 24);
+
   for (const handle of handles) {
     const existing = await prisma.channel.findFirst({ where: { handle } });
     if (existing) {
-      resolvedIds.add(existing.id);
-      continue;
+      const lastSync = existing.lastSync ? existing.lastSync.getTime() : 0;
+      const ttlMs = resolveTtlHours * 60 * 60 * 1000;
+      if (Date.now() - lastSync <= ttlMs) {
+        resolvedIds.add(existing.id);
+        continue;
+      }
     }
 
     try {
@@ -117,6 +159,7 @@ export async function syncChannels() {
 export async function syncStreams() {
   const apiKey = await getApiKey();
   const channels = await prisma.channel.findMany({ where: { isActive: true } });
+  const initialSyncDays = await getIntConfig('INITIAL_SYNC_DAYS', 2);
   
   const usePlaylistItems = await getBoolConfig('USE_PLAYLIST_ITEMS', true);
   const filterByCategory = await getBoolConfig('FILTER_BY_CATEGORY', false);
@@ -204,6 +247,21 @@ export async function syncStreams() {
              finalStatus = 'none'; // VOD or Ended
         }
 
+        const channelLastSync = channels.find((c) => c.id === item.snippet.channelId)?.lastSync;
+        const isFirstSyncForChannel = !channelLastSync;
+        if (isFirstSyncForChannel && initialSyncDays > 0) {
+          const publishedAt = item.snippet.publishedAt ? new Date(item.snippet.publishedAt) : null;
+          const cutoff = new Date(Date.now() - initialSyncDays * 24 * 60 * 60 * 1000);
+          if (publishedAt && publishedAt < cutoff) {
+            continue;
+          }
+        }
+
+        const existingStream = await prisma.stream.findUnique({ where: { videoId: item.id } });
+        if (!existingStream && finalStatus === 'none') {
+          continue;
+        }
+
         // Upsert Stream
         await prisma.stream.upsert({
           where: { videoId: item.id },
@@ -245,6 +303,8 @@ export async function syncStreams() {
       console.error('Error fetching video details:', error);
     }
   }
+
+  await enforceRecordedPolicy();
 }
 
 export async function syncStreamsForChannel(channelId: string) {
@@ -328,6 +388,10 @@ export async function syncStreamsForChannel(channelId: string) {
         let finalStatus = liveStatus === 'live' && actualStart && !actualEnd ? 'live' : (liveStatus === 'upcoming' ? 'upcoming' : 'none');
 
         const existingStream = await prisma.stream.findUnique({ where: { videoId: item.id } });
+        if (!existingStream && finalStatus === 'none') {
+          continue;
+        }
+
         if (existingStream) {
           updatedCount++;
         } else {
@@ -336,13 +400,20 @@ export async function syncStreamsForChannel(channelId: string) {
 
         await prisma.stream.upsert({
           where: { videoId: item.id },
-          update: { /* ... (dados de update) ... */ 
+          update: {
             title: item.snippet.title || '',
+            description: item.snippet.description || '',
             status: finalStatus,
+            thumbnailUrl: item.snippet.thumbnails?.maxres?.url || item.snippet.thumbnails?.high?.url,
+            watchUrl: `https://www.youtube.com/watch?v=${item.id}`,
             scheduledStart, actualStart, actualEnd,
+            durationISO: item.contentDetails?.duration,
+            categoryYoutube: categoryId,
+            tags: JSON.stringify(item.snippet.tags || []),
+            isAgeRestricted: item.contentDetails?.contentRating?.ytRating === 'ytAgeRestricted',
             lastSeen: new Date()
           },
-          create: { /* ... (dados de create) ... */
+          create: {
             videoId: item.id,
             channelId: item.snippet.channelId!,
             title: item.snippet.title || '',
@@ -369,6 +440,8 @@ export async function syncStreamsForChannel(channelId: string) {
       where: { id: channelId },
       data: { lastSync: new Date() }
   });
+
+  await enforceRecordedPolicy();
 
   return { newCount, updatedCount };
 }
