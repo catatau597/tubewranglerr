@@ -19,10 +19,20 @@ export async function GET() {
     });
 
     if (config) {
-      return NextResponse.json(JSON.parse(config.value));
-    } else {
-      // Retorna um valor padrão se não houver nada no banco
-      const defaultConfig: TitleFormatConfig = {
+      if (!config.value || config.value.trim() === '') {
+          console.warn(`[TITLE_FORMAT] Configuração vazia encontrada no banco. Retornando default.`);
+          // Fallthrough to default config below or return default here
+      } else {
+        try {
+           return NextResponse.json(JSON.parse(config.value));
+        } catch (e) {
+           console.error(`[TITLE_FORMAT] Erro ao analisar JSON: "${config.value}". Retornando default.`);
+        }
+      }
+    } 
+    
+    // Retorna um valor padrão se não houver nada no banco ou se for inválido
+    const defaultConfig: TitleFormatConfig = {
         components: [
           { id: 'status', label: '[STATUS]', enabled: true },
           { id: 'channelName', label: '[NOME DO CANAL]', enabled: true },
@@ -33,7 +43,6 @@ export async function GET() {
         useBrackets: true,
       };
       return NextResponse.json(defaultConfig);
-    }
   } catch (error) {
     console.error('Erro ao buscar configuração de formato de título:', error);
     return NextResponse.json({ error: 'Erro ao buscar configuração.' }, { status: 500 });

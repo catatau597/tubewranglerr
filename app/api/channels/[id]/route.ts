@@ -9,6 +9,8 @@ export async function PATCH(
 ) {
   try {
     const { id: channelId } = await params; // Pega o ID dos parâmetros da URL
+    console.log(`[PATCH] Atualizando canal: ${channelId}`);
+
     const body = await request.json();
     const { isActive } = body;
 

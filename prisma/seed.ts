@@ -32,9 +32,23 @@ async function main() {
       }
     }
     
+    const existing = await prisma.config.findUnique({ where: { key } });
+    
+    // Se existe e é do tipo JSON mas está vazio ou inválido, vamos forçar a correção
+    let shouldUpdate = false;
+    if (existing && meta.type === 'json') {
+      try {
+        if (!existing.value || existing.value.trim() === '') throw new Error('Empty');
+        JSON.parse(existing.value);
+      } catch (e) {
+        shouldUpdate = true;
+        console.log(`⚠️ Corrigindo configuração JSON inválida para: ${key}`);
+      }
+    }
+
     await prisma.config.upsert({
       where: { key },
-      update: {}, // Não atualiza se já existir para preservar dados do usuário
+      update: shouldUpdate ? { value } : {}, 
       create: { 
         key, 
         value, 
