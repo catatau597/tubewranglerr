@@ -24,7 +24,14 @@ export async function GET() {
           // Fallthrough to default config below or return default here
       } else {
         try {
-           return NextResponse.json(JSON.parse(config.value));
+           const parsed = JSON.parse(config.value);
+           // Validação extra: se não tiver componentes ou estiver vazio, usa o default
+           if (!parsed.components || !Array.isArray(parsed.components) || parsed.components.length === 0) {
+               console.warn('[TITLE_FORMAT] Configuração JSON incompleta. Retornando default.');
+               // Fallthrough to default config below
+           } else {
+               return NextResponse.json(parsed);
+           }
         } catch (e) {
            console.error(`[TITLE_FORMAT] Erro ao analisar JSON: "${config.value}". Retornando default.`);
         }

@@ -202,9 +202,21 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     orderBy: [{ scheduledStart: 'asc' }, { createdAt: 'desc' }],
   });
 
-  const titleConfig: TitleFormatConfig = titleConfigStr
-    ? JSON.parse(titleConfigStr)
-    : { components: [], useBrackets: true };
+  let titleConfig: TitleFormatConfig = {
+    components: [],
+    useBrackets: true,
+  };
+
+  if (titleConfigStr) {
+    try {
+      const parsed = JSON.parse(titleConfigStr);
+      if (parsed && Array.isArray(parsed.components)) {
+        titleConfig = parsed;
+      }
+    } catch (e) {
+      console.warn('Falha ao analisar TITLE_FORMAT_CONFIG, usando padrão:', e);
+    }
+  }
 
   const origin = new URL(req.url).origin;
   const appBaseUrl = configuredBaseUrl || origin;
