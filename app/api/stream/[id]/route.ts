@@ -1,65 +1,106 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { spawn } from 'child_process';
-import { getStreamUrl } from '@/lib/player/router'; // To be implemented
+import { routeProcess, StreamForRouting } from '@/lib/player/router';
+import { PlayerHealthMonitor } from '@/lib/player/health-monitor';
+import { getBoolConfig } from '@/lib/config';
+import { logEvent } from '@/lib/observability';
 
-// Dynamic Route Handler for Smart Player Proxy
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: videoId } = await params;
-  
-  // 1. Fetch Stream Status from DB
+
   const stream = await prisma.stream.findUnique({
     where: { videoId },
-    select: { status: true, watchUrl: true, thumbnailUrl: true }
+    select: {
+      videoId: true,
+      status: true,
+      watchUrl: true,
+      thumbnailUrl: true,
+      title: true,
+      actualStart: true,
+      actualEnd: true,
+      scheduledStart: true,
+    },
   });
 
   if (!stream) {
     return new NextResponse('Stream not found', { status: 404 });
   }
 
-  // 2. Determine Source based on Status
-  // Logic from smart_player.py ported here
-  let processArgs: string[] = [];
-  let command = '';
+  const streamForRouting: StreamForRouting = {
+    videoId: stream.videoId,
+    status: stream.status,
+    watchUrl: stream.watchUrl,
+    thumbnailUrl: stream.thumbnailUrl,
+    title: stream.title,
+    actualStart: stream.actualStart,
+    actualEnd: stream.actualEnd,
+    scheduledStart: stream.scheduledStart,
+  };
 
-  if (stream.status === 'live') {
-    command = 'streamlink';
-    processArgs = ['--stdout', stream.watchUrl, 'best'];
-  } else if (stream.status === 'none' || stream.status === 'vod') {
-    command = 'yt-dlp';
-    processArgs = ['-o', '-', stream.watchUrl];
-  } else {
-    // Upcoming/Placeholder logic (FFmpeg loop)
-    command = 'ffmpeg';
-    processArgs = [
-      '-re', '-i', stream.thumbnailUrl || 'placeholder.jpg',
-      '-f', 'mpegts', '-'
-      // ... full ffmpeg args for looping image
-    ];
+  const enableAnalytics = await getBoolConfig('PROXY_ENABLE_ANALYTICS', true);
+  if (enableAnalytics) {
+    await logEvent('INFO', 'SmartPlayer', 'Proxy access', { videoId, status: stream.status });
   }
 
-  // 3. Spawn Process and Pipe
-  const child = spawn(command, processArgs);
+  let child = routeProcess(streamForRouting);
+  const monitor = new PlayerHealthMonitor({ monitorInterval: 5000, maxRestarts: 3, baseBackoffMs: 750 });
 
-  // Create a ReadableStream from the child process stdout
+  await monitor.attach(
+    videoId,
+    () => routeProcess(streamForRouting),
+    (proc) => {
+      child = proc;
+    }
+  );
+
+  const timeoutId = setTimeout(() => {
+    if (!child.killed) child.kill('SIGKILL');
+    monitor.stop();
+  }, 1000 * 60 * 15);
+
+  request.signal.addEventListener('abort', () => {
+    if (!child.killed) child.kill('SIGTERM');
+    clearTimeout(timeoutId);
+    monitor.stop();
+  });
+
   const streamData = new ReadableStream({
     start(controller) {
       child.stdout.on('data', (chunk) => controller.enqueue(chunk));
-      child.stdout.on('end', () => controller.close());
-      child.stderr.on('data', (err) => console.error(`[${command}]`, err.toString()));
+
+      child.stdout.on('end', () => {
+        clearTimeout(timeoutId);
+        monitor.stop();
+        controller.close();
+      });
+
+      child.on('error', async (err) => {
+        await logEvent('ERROR', 'SmartPlayer', 'Spawn error', { videoId, error: err.message });
+        clearTimeout(timeoutId);
+        monitor.stop();
+        controller.error(err);
+      });
+
+      child.stderr.on('data', (err) => {
+        console.error(`[smart-player:${videoId}]`, err.toString());
+      });
     },
     cancel() {
-      child.kill();
-    }
+      clearTimeout(timeoutId);
+      monitor.stop();
+      if (!child.killed) child.kill('SIGTERM');
+    },
   });
 
   return new NextResponse(streamData, {
     headers: {
       'Content-Type': 'video/mp2t',
-      'Cache-Control': 'no-cache'
-    }
+      'Cache-Control': 'no-cache',
+    },
   });
 }
