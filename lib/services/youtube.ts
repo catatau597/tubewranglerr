@@ -1,7 +1,6 @@
 import { google } from 'googleapis';
 import prisma from '@/lib/db';
-import { getConfig, getListConfig, getIntConfig, getBoolConfig } from '@/lib/config';
-import { addHours, isAfter, isBefore } from 'date-fns';
+import { getConfig, getListConfig, getBoolConfig } from '@/lib/config';
 
 const youtube = google.youtube('v3');
 
@@ -336,13 +335,20 @@ export async function syncStreamsForChannel(channelId: string) {
 
         await prisma.stream.upsert({
           where: { videoId: item.id },
-          update: { /* ... (dados de update) ... */ 
+          update: {
             title: item.snippet.title || '',
+            description: item.snippet.description || '',
             status: finalStatus,
+            thumbnailUrl: item.snippet.thumbnails?.maxres?.url || item.snippet.thumbnails?.high?.url,
+            watchUrl: `https://www.youtube.com/watch?v=${item.id}`,
             scheduledStart, actualStart, actualEnd,
+            durationISO: item.contentDetails?.duration,
+            categoryYoutube: categoryId,
+            tags: JSON.stringify(item.snippet.tags || []),
+            isAgeRestricted: item.contentDetails?.contentRating?.ytRating === 'ytAgeRestricted',
             lastSeen: new Date()
           },
-          create: { /* ... (dados de create) ... */
+          create: {
             videoId: item.id,
             channelId: item.snippet.channelId!,
             title: item.snippet.title || '',
