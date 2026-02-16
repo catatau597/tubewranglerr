@@ -17,6 +17,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Server,
+  Shuffle,
   Bug,
 } from 'lucide-react'
 import { Toaster } from 'sonner';
@@ -118,6 +119,10 @@ export default function DashboardLayout({
                       <ListVideo className="h-4 w-4" />
                       {!isSidebarCollapsed && 'Conteúdo & Filtros'}
                     </Link>
+                    <Link href="/settings/mappings" className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings/mappings' ? 'bg-muted text-primary' : ''}`}>
+                      <Shuffle className="h-4 w-4" />
+                      {!isSidebarCollapsed && 'Mapeamentos'}
+                    </Link>
                     <Link href="/settings/title-format" className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings/title-format' ? 'bg-muted text-primary' : ''}`}>
                       <Palette className="h-4 w-4" />
                       {!isSidebarCollapsed && 'Formato de Título'}
@@ -136,11 +141,11 @@ export default function DashboardLayout({
                     </Link>
                     <Link href="/settings/system" className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings/system' ? 'bg-muted text-primary' : ''}`}>
                       <Server className="h-4 w-4" />
-                      {!isSidebarCollapsed && 'Sistema'}
+                      {!isSidebarCollapsed && 'Técnico'}
                     </Link>
                     <Link href="/settings/logs" className={`flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${pathname === '/settings/logs' ? 'bg-muted text-primary' : ''}`}>
                       <Bug className="h-4 w-4" />
-                      {!isSidebarCollapsed && 'Logs & Debug'}
+                      {!isSidebarCollapsed && 'Logs'}
                     </Link>
                   </nav>
                 )}

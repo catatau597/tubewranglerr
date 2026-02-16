@@ -24,7 +24,19 @@ const TAG_KEYS = new Set([
   'TARGET_CHANNEL_IDS',
 ]);
 
-const HIDDEN_KEYS = new Set(['TARGET_CHANNEL_HANDLES', 'TARGET_CHANNEL_IDS']);
+const HIDDEN_KEYS = new Set(['TARGET_CHANNEL_HANDLES', 'TARGET_CHANNEL_IDS', 'TITLE_FORMAT_CONFIG']);
+
+const CATEGORY_ORDER = [
+  'API & Canais',
+  'Agendador',
+  'Conteúdo & Filtros',
+  'Mapeamentos',
+  'Retenção (VOD)',
+  'Arquivos de Saída',
+  'Mídia & Placeholders',
+  'Técnico',
+  'Logs',
+];
 
 export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigItem[] }) {
   const router = useRouter();
@@ -72,6 +84,10 @@ export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigI
 
     if (config.key === 'ALLOWED_CATEGORY_IDS') {
       return (configMap.get('FILTER_BY_CATEGORY') || '').toLowerCase() === 'true';
+    }
+
+    if (config.key === 'MAX_RECORDED_PER_CHANNEL' || config.key === 'RECORDED_RETENTION_DAYS') {
+      return (configMap.get('KEEP_RECORDED_STREAMS') || '').toLowerCase() === 'true';
     }
 
     return true;
@@ -141,9 +157,23 @@ export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigI
     return acc;
   }, {} as Record<string, ConfigItem[]>);
 
+  const sortedGroupedEntries = Object.entries(groupedConfigs).sort(([left], [right]) => {
+    const leftIndex = CATEGORY_ORDER.indexOf(left);
+    const rightIndex = CATEGORY_ORDER.indexOf(right);
+
+    const normalizedLeft = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
+    const normalizedRight = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
+
+    if (normalizedLeft !== normalizedRight) {
+      return normalizedLeft - normalizedRight;
+    }
+
+    return left.localeCompare(right, 'pt-BR');
+  });
+
   return (
     <div className="space-y-6">
-      {Object.entries(groupedConfigs).map(([category, items]) => (
+      {sortedGroupedEntries.map(([category, items]) => (
         <div key={category} className="rounded-xl border bg-card text-card-foreground shadow p-6">
           <h3 className="text-lg font-semibold leading-none tracking-tight mb-4">{category}</h3>
 
