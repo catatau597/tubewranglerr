@@ -118,9 +118,25 @@ export async function GET(
   }
 
   const titleConfigStr = await getConfig('TITLE_FORMAT_CONFIG');
-  const titleConfig: TitleFormatConfig = titleConfigStr
-    ? JSON.parse(titleConfigStr)
-    : { components: [], useBrackets: true };
+  let titleConfig: TitleFormatConfig = {
+    components: [
+      { id: 'status', label: '[STATUS]', enabled: true },
+      { id: 'channelName', label: '[NOME DO CANAL]', enabled: true },
+      { id: 'eventName', label: '[NOME DO EVENTO]', enabled: true },
+    ],
+    useBrackets: true,
+  };
+
+  if (titleConfigStr) {
+    try {
+      const parsed = JSON.parse(titleConfigStr);
+      if (parsed && Array.isArray(parsed.components)) {
+        titleConfig = parsed;
+      }
+    } catch (e) {
+      console.warn('Falha ao analisar TITLE_FORMAT_CONFIG, usando padrão:', e);
+    }
+  }
 
   const origin = new URL(req.url).origin;
   const appBaseUrl = configuredBaseUrl || origin;
