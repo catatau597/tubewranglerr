@@ -1,0 +1,1 @@
+Diretório public para assets estáticos do Next.js. Necessário para build Docker.

@@ -1,5 +1,7 @@
 # Stage 1: Base image with full dependencies
 FROM node:20-alpine AS base
+# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 COPY package.json package-lock.json* ./
 # Install ALL dependencies, including devDependencies, so we have Prisma CLI and tsx
@@ -16,6 +18,7 @@ RUN npm run build
 # Stage 3: Production image - This image will contain the full app and node_modules
 FROM node:20-alpine AS runner
 WORKDIR /app
+RUN apk add --no-cache libc6-compat openssl
 
 ENV NODE_ENV=production
 # The DATABASE_URL will point to the volume mount in production
@@ -28,6 +31,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
+
+# Make entrypoint.sh executable
+RUN chmod +x /app/entrypoint.sh
 
 # Create a non-root user for security
 RUN addgroup --system --gid 1001 nodejs
