@@ -39,6 +39,7 @@ export const CONFIG_METADATA: Record<string, { type: string, category: string, d
   'RECORDED_RETENTION_DAYS': { type: 'int', category: 'Retenção (VOD)', description: 'Por quantos dias manter um VOD antes de deletar.' },
 
   // Categoria 6: Arquivos de Saída
+  'TUBEWRANGLERR_URL': { type: 'string', category: 'Arquivos de Saída', description: 'URL pública base do serviço para geração de links absolutos.' },
   'PLAYLIST_LIVE_FILENAME': { type: 'string', category: 'Arquivos de Saída', description: 'Nome do arquivo da playlist de lives (ex: live.m3u8).' },
   'PLAYLIST_UPCOMING_FILENAME': { type: 'string', category: 'Arquivos de Saída', description: 'Nome do arquivo da playlist de agendados (ex: upcoming.m3u8).' },
   'PLAYLIST_VOD_FILENAME': { type: 'string', category: 'Arquivos de Saída', description: 'Nome do arquivo da playlist de VODs (ex: vod.m3u8).' },
