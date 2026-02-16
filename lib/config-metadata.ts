@@ -59,6 +59,9 @@ export const CONFIG_METADATA: Record<string, { type: string; category: string; d
   PLAYLIST_GENERATE_PROXY: { type: 'bool', category: 'Arquivos de Saída', description: 'Habilita versão proxy (/api/stream).' },
   XMLTV_FILENAME: { type: 'string', category: 'Arquivos de Saída', description: 'Nome do arquivo XMLTV (EPG).' },
   EPG_DESCRIPTION_CLEANUP: { type: 'bool', category: 'Arquivos de Saída', description: 'Limpa descrição no EPG.' },
+  TVG_NAME_USE_DISPLAY_TITLE: { type: 'bool', category: 'Arquivos de Saída', description: 'Usar título de exibição (completo) no atributo tvg-name.' },
+  FORCE_UPPERCASE_GROUP_TITLE: { type: 'bool', category: 'Arquivos de Saída', description: 'Forçar group-title em MAIÚSCULAS.' },
+  FORCE_UPPERCASE_TITLE: { type: 'bool', category: 'Arquivos de Saída', description: 'Forçar tvg-name e título de exibição em MAIÚSCULAS.' },
   TITLE_FORMAT_CONFIG: { type: 'json', category: 'Arquivos de Saída', description: 'Configuração avançada para formatação do título.' },
 
   // Categoria 7: Mídia & Placeholders

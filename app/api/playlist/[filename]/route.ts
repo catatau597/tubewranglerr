@@ -155,6 +155,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     prefixWithChannel,
     titleFilterExpressionsStr,
     tvgNameUseDisplayTitle,
+    forceUppercaseGroupTitle,
+    forceUppercaseTitle,
   ] = await Promise.all([
     getConfig('PLAYLIST_LIVE_FILENAME', 'playlist_live.m3u8'),
     getConfig('PLAYLIST_UPCOMING_FILENAME', 'playlist_upcoming.m3u8'),
@@ -172,6 +174,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     getBoolConfig('PREFIX_TITLE_WITH_CHANNEL_NAME', true),
     getConfig('TITLE_FILTER_EXPRESSIONS', ''),
     getBoolConfig('TVG_NAME_USE_DISPLAY_TITLE', false),
+    getBoolConfig('FORCE_UPPERCASE_GROUP_TITLE', false),
+    getBoolConfig('FORCE_UPPERCASE_TITLE', false),
   ]);
 
   const categoryMappings = parseMappingConfig(categoryMappingsStr);
@@ -352,15 +356,28 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     );
 
     // TVG Name Logic: Use Display Title if configured, else use Channel Name
-    const tvgName = tvgNameUseDisplayTitle ? displayTitle : mappedChannelName;
+    let tvgName = tvgNameUseDisplayTitle ? displayTitle : mappedChannelName;
+
+    // Apply Uppercase Filters
+    if (forceUppercaseGroupTitle) {
+      groupTitle = groupTitle.toUpperCase();
+    }
+    
+    // For Display Title (which appears at end of line) and TVG Name
+    let finalDisplayTitle = displayTitle;
+    
+    if (forceUppercaseTitle) {
+       tvgName = tvgName.toUpperCase();
+       finalDisplayTitle = finalDisplayTitle.toUpperCase();
+    }
 
     const outputUrl = mode === 'direct' ? stream.watchUrl : `${appBaseUrl}/api/stream/${stream.videoId}`;
 
-    await logEvent('DEBUG', 'Playlist', `Stream added to M3U`, { displayTitle, outputUrl });
+    await logEvent('DEBUG', 'Playlist', `Stream added to M3U`, { displayTitle: finalDisplayTitle, outputUrl });
 
     // Use escapeAttribute to safely quote attributes
     m3uLines.push(
-      `#EXTINF:-1 tvg-id="${escapeAttribute(stream.channel.id)}" tvg-name="${escapeAttribute(tvgName)}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${escapeAttribute(groupTitle)}",${displayTitle}`,
+      `#EXTINF:-1 tvg-id="${escapeAttribute(stream.channel.id)}" tvg-name="${escapeAttribute(tvgName)}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${escapeAttribute(groupTitle)}",${finalDisplayTitle}`,
     );
     m3uLines.push(outputUrl);
   }
