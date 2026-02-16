@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { TagInput } from '@/components/ui/TagInput';
 
@@ -14,15 +14,28 @@ interface ConfigItem {
   description: string | null;
 }
 
+const TAG_KEYS = new Set([
+  'YOUTUBE_API_KEY',
+  'TITLE_FILTER_EXPRESSIONS',
+  'ALLOWED_CATEGORY_IDS',
+  'CATEGORY_MAPPINGS',
+  'CHANNEL_NAME_MAPPINGS',
+  'TARGET_CHANNEL_HANDLES',
+  'TARGET_CHANNEL_IDS',
+]);
+
+const HIDDEN_KEYS = new Set(['TARGET_CHANNEL_HANDLES', 'TARGET_CHANNEL_IDS']);
+
 export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigItem[] }) {
   const router = useRouter();
   const [configs, setConfigs] = useState(initialConfigs);
   const [loading, setLoading] = useState<string | null>(null);
 
+  const configMap = useMemo(() => new Map(configs.map((c) => [c.key, c.value])), [configs]);
+
   const handleSave = async (key: string, value: string | string[]) => {
     setLoading(key);
-    
-    // Se for um array (do TagInput), transforma em string
+
     const valueToSave = Array.isArray(value) ? value.join(',') : value;
 
     const promise = fetch('/api/config', {
@@ -32,86 +45,96 @@ export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigI
     });
 
     toast.promise(promise, {
-        loading: `Salvando ${key}...`,
-        success: () => {
-            router.refresh();
-            // Atualiza o estado local para refletir a mudança
-            setConfigs(configs.map(c => c.key === key ? {...c, value: valueToSave} : c));
-            return 'Configuração salva!';
-        },
-        error: 'Erro ao salvar configuração.'
+      loading: `Salvando ${key}...`,
+      success: async (res) => {
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'Falha ao salvar configuração.');
+        }
+        router.refresh();
+        setConfigs((prev) => prev.map((c) => (c.key === key ? { ...c, value: valueToSave } : c)));
+        return 'Configuração salva!';
+      },
+      error: (e) => (e instanceof Error ? e.message : 'Erro ao salvar configuração.'),
     });
 
     try {
-        await promise;
-    } catch (e) {
-        // o toast já trata o erro
+      await promise;
     } finally {
-        setLoading(null);
+      setLoading(null);
     }
   };
 
+  const isVisibleByDependency = (config: ConfigItem) => {
+    if (config.key === 'SCHEDULER_ACTIVE_START_HOUR' || config.key === 'SCHEDULER_ACTIVE_END_HOUR') {
+      return (configMap.get('ENABLE_SCHEDULER_ACTIVE_HOURS') || '').toLowerCase() === 'true';
+    }
+
+    if (config.key === 'ALLOWED_CATEGORY_IDS') {
+      return (configMap.get('FILTER_BY_CATEGORY') || '').toLowerCase() === 'true';
+    }
+
+    return true;
+  };
+
   const renderInput = (config: ConfigItem) => {
-    if (config.key === 'YOUTUBE_API_KEY' || config.key === 'TITLE_FILTER_EXPRESSIONS' || config.key === 'ALLOWED_CATEGORY_IDS') {
+    if (TAG_KEYS.has(config.key)) {
       return (
         <TagInput
-          initialTags={config.value ? config.value.split(',').filter(Boolean) : []}
+          initialTags={config.value ? config.value.split(',').map((t) => t.trim()).filter(Boolean) : []}
           onTagsChange={(tags) => handleSave(config.key, tags)}
           disabled={loading === config.key}
         />
       );
     }
-    
+
     switch (config.type) {
-      case 'bool':
+      case 'bool': {
+        const current = (config.value || 'false').toLowerCase() === 'true';
         return (
-          <select
-            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            defaultValue={config.value}
-            onChange={(e) => handleSave(config.key, e.target.value)}
-            disabled={loading === config.key}
-          >
-            <option value="true">Ativado (True)</option>
-            <option value="false">Desativado (False)</option>
-          </select>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleSave(config.key, (!current).toString())}
+              disabled={loading === config.key}
+              className={`rounded-md px-3 py-2 text-sm font-medium ${current ? 'bg-blue-600 text-white' : 'bg-muted text-muted-foreground'}`}
+            >
+              {current ? 'ATIVADO' : 'DESATIVADO'}
+            </button>
+          </div>
         );
+      }
       case 'int':
         return (
-          <div className="flex gap-2">
-            <input
-              type="number"
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              defaultValue={config.value}
-              onBlur={(e) => {
-                if (e.target.value !== config.value) handleSave(config.key, e.target.value);
-              }}
-              disabled={loading === config.key}
-            />
-          </div>
+          <input
+            type="number"
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+            defaultValue={config.value}
+            onBlur={(e) => {
+              if (e.target.value !== config.value) handleSave(config.key, e.target.value);
+            }}
+            disabled={loading === config.key}
+          />
         );
       default:
         return (
-          <div className="flex gap-2">
-            <input
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              defaultValue={config.value}
-              onBlur={(e) => {
-                if (e.target.value !== config.value) handleSave(config.key, e.target.value);
-              }}
-              disabled={loading === config.key}
-            />
-          </div>
+          <input
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+            defaultValue={config.value}
+            onBlur={(e) => {
+              if (e.target.value !== config.value) handleSave(config.key, e.target.value);
+            }}
+            disabled={loading === config.key}
+          />
         );
     }
   };
 
-  // Group configs by category for display
   const groupedConfigs = configs.reduce((acc, config) => {
-    // Filter out unwanted configs
-    if (config.key === 'TARGET_CHANNEL_HANDLES' || config.key === 'TARGET_CHANNEL_IDS') {
+    if (HIDDEN_KEYS.has(config.key) || !isVisibleByDependency(config)) {
       return acc;
     }
-    
+
     const cat = config.category || 'Geral';
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(config);
@@ -122,20 +145,14 @@ export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigI
     <div className="space-y-6">
       {Object.entries(groupedConfigs).map(([category, items]) => (
         <div key={category} className="rounded-xl border bg-card text-card-foreground shadow p-6">
-          <h3 className="text-lg font-semibold leading-none tracking-tight mb-4">
-            {category}
-          </h3>
-          
+          <h3 className="text-lg font-semibold leading-none tracking-tight mb-4">{category}</h3>
+
           <div className="space-y-4">
             {items.map((config) => (
               <div key={config.key} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start border-b pb-4 last:border-0 last:pb-0">
                 <div>
-                  <p className="text-sm font-medium leading-none mb-1">
-                    {config.description || config.key}
-                  </p>
-                  <code className="text-[0.75rem] text-muted-foreground bg-muted/50 px-1 py-0.5 rounded font-mono">
-                    {config.key}
-                  </code>
+                  <p className="text-sm font-medium leading-none mb-1">{config.description || config.key}</p>
+                  <code className="text-[0.75rem] text-muted-foreground bg-muted/50 px-1 py-0.5 rounded font-mono">{config.key}</code>
                 </div>
                 <div className="relative">
                   {renderInput(config)}
