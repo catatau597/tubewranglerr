@@ -5,6 +5,7 @@ import { canUseBinaryRoute, getRequiredBinary, getSmartPlayerMode } from '@/lib/
 import { PlayerHealthMonitor } from '@/lib/player/health-monitor';
 import { getBoolConfig } from '@/lib/config';
 import { logEvent } from '@/lib/observability';
+import { getConfig } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,6 +82,10 @@ export async function GET(
     await logEvent('INFO', 'SmartPlayer', 'Proxy access', { videoId, status: stream.status });
   }
 
+  // Busca user-agent e cookies
+  const userAgent = await getConfig('STREAM_USER_AGENT', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+  const cookiesPath = await getConfig('STREAM_COOKIES_PATH', '/app/cookies.txt');
+
   const liveEngineOrder: LiveEngine[] = ['streamlink', 'yt-dlp'];
   let liveEngineAttempt = 0;
 
@@ -93,10 +98,10 @@ export async function GET(
         void logEvent('WARN', 'SmartPlayer', 'Falling back live engine', { videoId, engine });
       }
 
-      return routeProcess(streamForRouting, { liveEngine: engine });
+      return routeProcess(streamForRouting, { liveEngine: engine, userAgent, cookiesPath });
     }
 
-    return routeProcess(streamForRouting);
+    return routeProcess(streamForRouting, { userAgent, cookiesPath });
   };
 
   let child = createProcess();

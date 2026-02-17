@@ -1,6 +1,24 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef } from 'react';
+// Sugestões de user-agents populares
+const USER_AGENT_PRESETS = [
+  {
+    label: 'Chrome (Windows)',
+    value:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  },
+  {
+    label: 'Firefox (Linux)',
+    value:
+      'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0',
+  },
+  {
+    label: 'Safari (macOS)',
+    value:
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+  },
+];
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -36,12 +54,33 @@ const CATEGORY_ORDER = [
   'Mídia & Placeholders',
   'Técnico',
   'Logs',
+  'Streaming',
 ];
 
+const STREAM_KEYS = new Set(['STREAM_USER_AGENT', 'STREAM_COOKIES_PATH']);
 export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigItem[] }) {
   const router = useRouter();
   const [configs, setConfigs] = useState(initialConfigs);
   const [loading, setLoading] = useState<string | null>(null);
+
+  // Para upload de cookies
+  const cookiesInputRef = useRef<HTMLInputElement>(null);
+
+  // Busca valor atual do user-agent
+  const userAgentConfig = configs.find((c) => c.key === 'USER_AGENT');
+  const cookiesConfig = configs.find((c) => c.key === 'COOKIES_TXT');
+
+  // Handler para upload de cookies.txt
+  const handleCookiesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoading('COOKIES_TXT');
+    const text = await file.text();
+    await handleSave('COOKIES_TXT', text);
+    setLoading(null);
+    toast.success('Cookies atualizados!');
+    router.refresh();
+  };
 
   const configMap = useMemo(() => new Map(configs.map((c) => [c.key, c.value])), [configs]);
 
@@ -103,6 +142,36 @@ export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigI
         />
       );
     }
+
+      // Campos especiais para streaming
+      if (STREAM_KEYS.has(config.key)) {
+        if (config.key === 'STREAM_USER_AGENT') {
+          return (
+            <input
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+              defaultValue={config.value}
+              placeholder="User-Agent (ex: Mozilla/5.0...)"
+              onBlur={(e) => {
+                if (e.target.value !== config.value) handleSave(config.key, e.target.value);
+              }}
+              disabled={loading === config.key}
+            />
+          );
+        }
+        if (config.key === 'STREAM_COOKIES_PATH') {
+          return (
+            <input
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+              defaultValue={config.value}
+              placeholder="Caminho para cookies.txt"
+              onBlur={(e) => {
+                if (e.target.value !== config.value) handleSave(config.key, e.target.value);
+              }}
+              disabled={loading === config.key}
+            />
+          );
+        }
+      }
 
     switch (config.type) {
       case 'bool': {
@@ -173,6 +242,47 @@ export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigI
 
   return (
     <div className="space-y-6">
+      {/* Bloco de configuração de User-Agent */}
+      <div className="bg-muted rounded-lg p-4 flex flex-col gap-2">
+        <div className="font-semibold">User-Agent global</div>
+        <div className="flex gap-2 items-center">
+          <select
+            className="border rounded px-2 py-1"
+            value={userAgentConfig?.value || ''}
+            onChange={(e) => handleSave('USER_AGENT', e.target.value)}
+            disabled={loading === 'USER_AGENT'}
+          >
+            <option value="">Selecione um user-agent...</option>
+            {USER_AGENT_PRESETS.map((ua) => (
+              <option key={ua.label} value={ua.value}>{ua.label}</option>
+            ))}
+          </select>
+          <input
+            className="flex-1 border rounded px-2 py-1"
+            placeholder="Ou digite um user-agent personalizado"
+            value={userAgentConfig?.value || ''}
+            onChange={(e) => handleSave('USER_AGENT', e.target.value)}
+            disabled={loading === 'USER_AGENT'}
+          />
+        </div>
+      </div>
+
+      {/* Bloco de upload de cookies.txt */}
+      <div className="bg-muted rounded-lg p-4 flex flex-col gap-2">
+        <div className="font-semibold">Cookies.txt global</div>
+        <div className="flex gap-2 items-center">
+          <input
+            type="file"
+            accept=".txt"
+            ref={cookiesInputRef}
+            onChange={handleCookiesUpload}
+            disabled={loading === 'COOKIES_TXT'}
+          />
+          {cookiesConfig?.value && (
+            <span className="text-xs text-muted-foreground">Cookies carregados ({cookiesConfig.value.length} chars)</span>
+          )}
+        </div>
+      </div>
       {sortedGroupedEntries.map(([category, items]) => (
         <div key={category} className="rounded-xl border bg-card text-card-foreground shadow p-6">
           <h3 className="text-lg font-semibold leading-none tracking-tight mb-4">{category}</h3>

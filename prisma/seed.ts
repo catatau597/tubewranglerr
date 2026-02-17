@@ -58,7 +58,31 @@ async function main() {
       }
     })
   }
-  console.log('✅ Configurações populadas.')
+  console.log('✅ Configurações populadas.');
+
+  // Configuração inicial para streaming
+  await prisma.config.upsert({
+    where: { key: 'STREAM_USER_AGENT' },
+    update: {},
+    create: {
+      key: 'STREAM_USER_AGENT',
+      value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      type: 'string',
+      category: 'Streaming',
+      description: 'User-Agent usado para streaming (streamlink, yt-dlp, ffmpeg)'
+    }
+  });
+  await prisma.config.upsert({
+    where: { key: 'STREAM_COOKIES_PATH' },
+    update: {},
+    create: {
+      key: 'STREAM_COOKIES_PATH',
+      value: '/app/cookies.txt',
+      type: 'string',
+      category: 'Streaming',
+      description: 'Caminho para cookies.txt usado no streaming'
+    }
+  });
 
   // 2. Popular Canais Iniciais (se definidos no .env)
   const initialChannelIds = (process.env.TARGET_CHANNEL_IDS || '').split(',').map(s => s.trim()).filter(Boolean)

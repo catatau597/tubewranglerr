@@ -61,15 +61,17 @@ export function runFfmpegPlaceholder(stream: StreamForRouting, userAgent = 'Tube
   return spawn('ffmpeg', args);
 }
 
-export function runStreamlink(stream: StreamForRouting): ChildProcessWithoutNullStreams {
-  return spawn('streamlink', ['--stdout', '--hls-live-restart', stream.watchUrl, 'best']);
+export function runStreamlink(stream: StreamForRouting, userAgent?: string, cookiesPath?: string): ChildProcessWithoutNullStreams {
+  const args = ['--stdout', '--hls-live-restart'];
+  if (userAgent) args.push('--http-header', `User-Agent=${userAgent}`);
+  if (cookiesPath) args.push('--cookies', cookiesPath);
+  args.push(stream.watchUrl, 'best');
+  return spawn('streamlink', args);
 }
 
-// Força o uso do downloader ffmpeg para reduzir buffering agressivo de VOD em disco/memória.
-export function buildYtDlpArgs(stream: StreamForRouting): string[] {
+export function buildYtDlpArgs(stream: StreamForRouting, userAgent?: string, cookiesPath?: string): string[] {
   const isLiveLike = isGenuinelyLive(stream);
-
-  return [
+  const args = [
     '-f', isLiveLike ? 'best' : 'bv*+ba/best',
     '--no-part',
     '--downloader', 'default:ffmpeg',
@@ -80,26 +82,31 @@ export function buildYtDlpArgs(stream: StreamForRouting): string[] {
     '-o', '-',
     stream.watchUrl,
   ];
+  if (userAgent) args.push('--user-agent', userAgent);
+  if (cookiesPath) args.push('--cookies', cookiesPath);
+  return args;
 }
 
-export function runYtDlp(stream: StreamForRouting): ChildProcessWithoutNullStreams {
-  return spawn('yt-dlp', buildYtDlpArgs(stream));
+export function runYtDlp(stream: StreamForRouting, userAgent?: string, cookiesPath?: string): ChildProcessWithoutNullStreams {
+  return spawn('yt-dlp', buildYtDlpArgs(stream, userAgent, cookiesPath));
 }
 
 export type LiveEngine = 'streamlink' | 'yt-dlp';
 
 export function routeProcess(
   stream: StreamForRouting,
-  options?: { liveEngine?: LiveEngine }
+  options?: { liveEngine?: LiveEngine, userAgent?: string, cookiesPath?: string }
 ): ChildProcessWithoutNullStreams {
+  const userAgent = options?.userAgent;
+  const cookiesPath = options?.cookiesPath;
   if (isGenuinelyLive(stream)) {
     const engine = options?.liveEngine ?? 'streamlink';
-    return engine === 'yt-dlp' ? runYtDlp(stream) : runStreamlink(stream);
+    return engine === 'yt-dlp'
+      ? runYtDlp(stream, userAgent, cookiesPath)
+      : runStreamlink(stream, userAgent, cookiesPath);
   }
-
   if (stream.status === 'none' || stream.status === 'vod') {
-    return runYtDlp(stream);
+    return runYtDlp(stream, userAgent, cookiesPath);
   }
-
-  return runFfmpegPlaceholder(stream);
+  return runFfmpegPlaceholder(stream, userAgent);
 }
