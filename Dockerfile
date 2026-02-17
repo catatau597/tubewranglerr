@@ -1,9 +1,7 @@
 # Stage 1: Base image with full dependencies
 FROM node:20-alpine AS base
-# Instala dependências essenciais para streaming e atualização de ferramentas
-RUN apk add --no-cache libc6-compat openssl ffmpeg python3 py3-pip curl \
-	&& pip3 install --upgrade pip \
-	&& pip3 install --upgrade yt-dlp streamlink
+# Instala dependências essenciais para streaming (tudo via apk)
+RUN apk add --no-cache libc6-compat openssl ffmpeg python3 py3-pip curl yt-dlp streamlink
 WORKDIR /app
 COPY package.json package-lock.json* ./
 # Install ALL dependencies, including devDependencies, so we have Prisma CLI and tsx
@@ -20,9 +18,7 @@ RUN npm run build
 # Stage 3: Production image - This image will contain the full app and node_modules
 FROM node:20-alpine AS runner
 WORKDIR /app
-RUN apk add --no-cache libc6-compat openssl ffmpeg python3 py3-pip curl \
-	&& pip3 install --upgrade pip \
-	&& pip3 install --upgrade yt-dlp streamlink
+RUN apk add --no-cache libc6-compat openssl ffmpeg python3 py3-pip curl yt-dlp streamlink
 
 ENV NODE_ENV=production
 # The DATABASE_URL will point to the volume mount in production
