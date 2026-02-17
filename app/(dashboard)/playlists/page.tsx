@@ -64,11 +64,11 @@ export default function PlaylistsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {generateProxy && renderLinkCard('Live (Proxy)', `${baseUrl}/api/playlist_${playlistLive}_proxy.m3u`)}
-        {generateDirect && renderLinkCard('Live (Direct)', `${baseUrl}/api/playlist_${playlistLive}_direct.m3u`)}
-        {generateProxy && renderLinkCard('Upcoming (Proxy)', `${baseUrl}/api/playlist_${playlistUpcoming}_proxy.m3u`)}
-        {generateProxy && renderLinkCard('VOD (Proxy)', `${baseUrl}/api/playlist_${playlistVod}_proxy.m3u`)}
-        {generateDirect && renderLinkCard('VOD (Direct)', `${baseUrl}/api/playlist_${playlistVod}_direct.m3u`)}
+        {generateProxy && renderLinkCard('Live (Proxy)', `${baseUrl}/api/playlist/playlist_${playlistLive}_proxy.m3u`)}
+        {generateDirect && renderLinkCard('Live (Direct)', `${baseUrl}/api/playlist/playlist_${playlistLive}_direct.m3u`)}
+        {generateProxy && renderLinkCard('Upcoming (Proxy)', `${baseUrl}/api/playlist/playlist_${playlistUpcoming}_proxy.m3u`)}
+        {generateProxy && renderLinkCard('VOD (Proxy)', `${baseUrl}/api/playlist/playlist_${playlistVod}_proxy.m3u`)}
+        {generateDirect && renderLinkCard('VOD (Direct)', `${baseUrl}/api/playlist/playlist_${playlistVod}_direct.m3u`)}
         {renderLinkCard('Guia de Programação (EPG)', `${baseUrl}/api/epg.xml`)}
       </div>
 
