@@ -57,7 +57,6 @@ const CATEGORY_ORDER = [
   'Streaming',
 ];
 
-const STREAM_KEYS = new Set(['STREAM_USER_AGENT', 'STREAM_COOKIES_PATH']);
 export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigItem[] }) {
   const router = useRouter();
   const [configs, setConfigs] = useState(initialConfigs);
@@ -142,36 +141,6 @@ export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigI
         />
       );
     }
-
-      // Campos especiais para streaming
-      if (STREAM_KEYS.has(config.key)) {
-        if (config.key === 'STREAM_USER_AGENT') {
-          return (
-            <input
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
-              defaultValue={config.value}
-              placeholder="User-Agent (ex: Mozilla/5.0...)"
-              onBlur={(e) => {
-                if (e.target.value !== config.value) handleSave(config.key, e.target.value);
-              }}
-              disabled={loading === config.key}
-            />
-          );
-        }
-        if (config.key === 'STREAM_COOKIES_PATH') {
-          return (
-            <input
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
-              defaultValue={config.value}
-              placeholder="Caminho para cookies.txt"
-              onBlur={(e) => {
-                if (e.target.value !== config.value) handleSave(config.key, e.target.value);
-              }}
-              disabled={loading === config.key}
-            />
-          );
-        }
-      }
 
     switch (config.type) {
       case 'bool': {

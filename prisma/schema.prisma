@@ -1,3 +1,13 @@
+// --------------------------------------------------------
+// USER AGENTS PERSONALIZADOS
+// --------------------------------------------------------
+model UserAgent {
+  id    String @id @default(uuid())
+  name  String
+  value String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 // prisma/schema.prisma
 
 generator client {

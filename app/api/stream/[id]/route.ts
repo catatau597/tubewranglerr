@@ -6,6 +6,7 @@ import { PlayerHealthMonitor } from '@/lib/player/health-monitor';
 import { getBoolConfig } from '@/lib/config';
 import { logEvent } from '@/lib/observability';
 import { getConfig } from '@/lib/config';
+import { getActiveUserAgent } from '@/lib/userAgent';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,7 +84,8 @@ export async function GET(
   }
 
   // Busca user-agent e cookies
-  const userAgent = await getConfig('STREAM_USER_AGENT', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+  const activeAgent = await getActiveUserAgent();
+  const userAgent = activeAgent?.value || '';
   const cookiesPath = await getConfig('STREAM_COOKIES_PATH', '/app/cookies.txt');
 
   const liveEngineOrder: LiveEngine[] = ['streamlink', 'yt-dlp'];
