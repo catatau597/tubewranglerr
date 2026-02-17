@@ -31,8 +31,8 @@ export function getRequestId(req?: Request): string {
 }
 
 export async function logEvent(level: LogLevel, component: string, message: string, context?: LogContext) {
-  const globalLevel = (await getConfig('LOG_LEVEL', 'INFO')) as LogLevel;
-  const smartPlayerLevel = (await getConfig('SMART_PLAYER_LOG_LEVEL', 'INFO')) as LogLevel;
+  const globalLevel = await getConfig('LOG_LEVEL', 'INFO');
+  const smartPlayerLevel = await getConfig('SMART_PLAYER_LOG_LEVEL', 'INFO');
 
   const currentLevel = component === 'SmartPlayer' ? smartPlayerLevel : globalLevel;
   
@@ -40,7 +40,7 @@ export async function logEvent(level: LogLevel, component: string, message: stri
   const line = `[${level}] [${component}] ${message}${serializeContext(context)}`;
   
   // Check if we should log to console based on level OR if it is DEBUG (force)
-  if (level === 'DEBUG' || LOG_LEVEL_PRIORITY[level] >= LOG_LEVEL_PRIORITY[currentLevel]) {
+  if (level === 'DEBUG' || LOG_LEVEL_PRIORITY[level as LogLevel] >= LOG_LEVEL_PRIORITY[currentLevel as LogLevel]) {
       if (level === 'ERROR') {
         console.error(line);
       } else if (level === 'WARN') {
@@ -51,7 +51,7 @@ export async function logEvent(level: LogLevel, component: string, message: stri
   }
 
   // Only persist to DB if it meets the configured level to avoid flooding DB
-  if (LOG_LEVEL_PRIORITY[level] < LOG_LEVEL_PRIORITY[currentLevel]) {
+  if (LOG_LEVEL_PRIORITY[level as LogLevel] < LOG_LEVEL_PRIORITY[currentLevel as LogLevel]) {
     return;
   }
 

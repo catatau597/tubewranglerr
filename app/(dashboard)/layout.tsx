@@ -69,12 +69,14 @@ export default function DashboardLayout({
     document.body.style.userSelect = 'none';
   };
 
+  const sidebarCurrentWidth = isSidebarCollapsed ? 80 : sidebarWidth;
+
   return (
     <>
       <div className="flex h-screen w-full transition-all duration-150">
         <aside 
           className="hidden shrink-0 border-r bg-muted/40 md:block transition-[width] duration-300 ease-in-out"
-          style={{ width: isSidebarCollapsed ? 80 : sidebarWidth }}
+          style={{ width: sidebarCurrentWidth }}
         >
           <div className="flex h-full max-h-screen flex-col gap-2">
             <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">

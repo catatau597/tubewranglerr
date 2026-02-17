@@ -239,6 +239,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
       headers: { 'Content-Type': 'application/vnd.apple.mpegurl' },
     });
   }
+<<<<<<< HEAD
 
   if (mode === 'direct' && !generateDirect) {
     return NextResponse.json({ error: 'Playlist direta desativada' }, { status: 404 });
@@ -345,6 +346,43 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     // Log category for debugging mapping issues
     await logEvent('DEBUG', 'Playlist', `Processing stream: ${stream.title}`, { categoryId: stream.categoryYoutube, categoryName, groupTitle });
 
+=======
+
+
+  if (targetStatus === 'upcoming' && mode === 'direct') {
+    return NextResponse.json(
+      { error: 'Playlist upcoming suporta apenas modo proxy' },
+      { status: 404 }
+    );
+  }
+
+  if (mode === 'direct' && !generateDirect) {
+    return NextResponse.json({ error: 'Playlist direta desativada' }, { status: 404 });
+  }
+  if (mode === 'proxy' && !generateProxy) {
+    return NextResponse.json({ error: 'Playlist proxy desativada' }, { status: 404 });
+  }
+
+  const streams = await prisma.stream.findMany({
+    where: { status: targetStatus },
+    include: { channel: true },
+    orderBy: [{ scheduledStart: 'asc' }, { createdAt: 'desc' }],
+  });
+
+  const titleConfig: TitleFormatConfig = titleConfigStr
+    ? JSON.parse(titleConfigStr)
+    : { components: [], useBrackets: true };
+
+  const origin = new URL(req.url).origin;
+  const appBaseUrl = configuredBaseUrl || origin;
+
+  const m3uLines = ['#EXTM3U', '#EXT-X-VERSION:3', '#EXT-X-TARGETDURATION:10'];
+
+  for (const stream of streams) {
+    const mappedChannelName = channelMappings[stream.channel.title] || stream.channel.customName || stream.channel.title;
+    const statusLabel = stream.status === 'live' ? 'LIVE 🔴' : stream.status === 'upcoming' ? 'AGENDADO' : 'GRAVADO';
+    const groupTitle = stream.categoryYoutube ? categoryMappings[stream.categoryYoutube] || mappedChannelName : mappedChannelName;
+>>>>>>> pr-13
     const displayTitle = generateDisplayTitle(
       stream,
       mappedChannelName,
@@ -352,6 +390,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
       statusLabel,
       prefixWithStatus,
       prefixWithChannel,
+<<<<<<< HEAD
       titleFilters
     );
 
@@ -378,6 +417,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     // Use escapeAttribute to safely quote attributes
     m3uLines.push(
       `#EXTINF:-1 tvg-id="${escapeAttribute(stream.channel.id)}" tvg-name="${escapeAttribute(tvgName)}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${escapeAttribute(groupTitle)}",${finalDisplayTitle}`,
+=======
+    );
+
+    const outputUrl = mode === 'direct' ? stream.watchUrl : `${appBaseUrl}/api/stream/${stream.videoId}`;
+
+    m3uLines.push(
+      `#EXTINF:-1 tvg-id="${stream.channel.id}" tvg-name="${mappedChannelName}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${groupTitle}",${displayTitle}`,
+>>>>>>> pr-13
     );
     m3uLines.push(outputUrl);
   }
@@ -389,6 +436,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
 
   const m3uContent = m3uLines.join('\n');
 
+<<<<<<< HEAD
   // Use .m3u and audio/x-mpegurl for ALL playlists to ensure maximum compatibility (VLC, IPTV players).
   // Even for proxy mode (which links to HLS), a simple .m3u playlist is more widely supported as a channel list.
   const fileExtension = 'm3u';
@@ -397,6 +445,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
   // Ensure filename has correct extension if not already present or replace it
   const downloadFilename = filename.replace(/\.(m3u|m3u8)$/, '') + `.${fileExtension}`;
 
+=======
+>>>>>>> pr-13
   return new NextResponse(m3uContent, {
     headers: {
       'Content-Type': contentType,

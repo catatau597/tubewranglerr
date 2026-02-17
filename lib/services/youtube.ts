@@ -56,9 +56,6 @@ async function getApiKey(): Promise<string> {
   const keyToUse = apiKeys[apiKeyIndex];
   apiKeyIndex = (apiKeyIndex + 1) % apiKeys.length;
   
-  // Log para depuração, mostrando qual chave está sendo usada.
-  console.log(`Using API Key at index ${apiKeyIndex} (ending with ...${keyToUse.slice(-4)})`);
-
   return keyToUse;
 }
 
@@ -161,11 +158,10 @@ export async function syncStreams() {
   const apiKey = await getApiKey();
   const channels = await prisma.channel.findMany({ where: { isActive: true } });
   const initialSyncDays = await getIntConfig('INITIAL_SYNC_DAYS', 2);
-  
+  const keepRecordedStreams = await getBoolConfig('KEEP_RECORDED_STREAMS', true);
   const usePlaylistItems = await getBoolConfig('USE_PLAYLIST_ITEMS', true);
   const filterByCategory = await getBoolConfig('FILTER_BY_CATEGORY', false);
   const allowedCategories = filterByCategory ? await getListConfig('ALLOWED_CATEGORY_IDS') : [];
-  const keepRecordedStreams = await getBoolConfig('KEEP_RECORDED_STREAMS', true);
   
   const videoIds = new Set<string>();
 
@@ -311,9 +307,9 @@ export async function syncStreamsForChannel(channelId: string) {
   }
   
   const usePlaylistItems = await getBoolConfig('USE_PLAYLIST_ITEMS', true);
+  const keepRecordedStreams = await getBoolConfig('KEEP_RECORDED_STREAMS', true);
   const filterByCategory = await getBoolConfig('FILTER_BY_CATEGORY', false);
   const allowedCategories = filterByCategory ? await getListConfig('ALLOWED_CATEGORY_IDS') : [];
-  const keepRecordedStreams = await getBoolConfig('KEEP_RECORDED_STREAMS', true);
   
   const videoIds = new Set<string>();
 

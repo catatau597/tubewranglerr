@@ -65,8 +65,25 @@ export function runStreamlink(stream: StreamForRouting): ChildProcessWithoutNull
   return spawn('streamlink', ['--stdout', stream.watchUrl, 'best']);
 }
 
+// Força o uso do downloader ffmpeg para reduzir buffering agressivo de VOD em disco/memória.
+export function buildYtDlpArgs(stream: StreamForRouting): string[] {
+  const isLiveLike = isGenuinelyLive(stream);
+
+  return [
+    '-f', isLiveLike ? 'best' : 'bv*+ba/best',
+    '--no-part',
+    '--downloader', 'default:ffmpeg',
+    '--downloader', 'm3u8:ffmpeg',
+    '--concurrent-fragments', '1',
+    '--hls-use-mpegts',
+    '--downloader-args', 'ffmpeg_i:-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+    '-o', '-',
+    stream.watchUrl,
+  ];
+}
+
 export function runYtDlp(stream: StreamForRouting): ChildProcessWithoutNullStreams {
-  return spawn('yt-dlp', ['-o', '-', stream.watchUrl]);
+  return spawn('yt-dlp', buildYtDlpArgs(stream));
 }
 
 export function routeProcess(stream: StreamForRouting): ChildProcessWithoutNullStreams {

@@ -82,4 +82,20 @@ export async function startScheduler() {
   // Trigger immediate initial sync
   await logEvent('INFO', 'Scheduler', 'Triggering immediate initial sync');
   runSync().catch(err => console.error('Initial sync failed', err));
+}      await logEvent('INFO', 'Scheduler', 'Main sync completed');
+    } catch (error) {
+      schedulerMetrics.lastErrorAt = new Date().toISOString();
+      schedulerMetrics.lastErrorMessage = error instanceof Error ? error.message : String(error);
+      await logEvent('ERROR', 'Scheduler', 'Sync failed', { error: schedulerMetrics.lastErrorMessage });
+    } finally {
+      isJobInProgress = false;
+      schedulerMetrics.inProgress = false;
+    }
+  };
+
+  cron.schedule(cronExpression, runSync);
+
+  // Trigger immediate initial sync
+  await logEvent('INFO', 'Scheduler', 'Triggering immediate initial sync');
+  runSync().catch(err => console.error('Initial sync failed', err));
 }
