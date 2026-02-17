@@ -1,3 +1,4 @@
+import React from 'react';
 import prisma from '@/lib/db';
 import ConfigList from '../ConfigList';
 import ApiSettingsClientBlocks from './ApiSettingsClientBlocks';
