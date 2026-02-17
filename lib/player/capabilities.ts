@@ -38,9 +38,9 @@ export function getSmartPlayerMode(): SmartPlayerMode {
   return 'auto';
 }
 
-export function getRequiredBinary(stream: StreamForRouting): keyof BinaryCapabilities {
+export function getRequiredBinary(stream: StreamForRouting): string {
   if (stream.status === 'live' && Boolean(stream.actualStart) && !stream.actualEnd) {
-    return 'ytDlp';
+    return 'streamlink_or_ytDlp';
   }
 
   if (stream.status === 'none' || stream.status === 'vod') {
@@ -51,7 +51,15 @@ export function getRequiredBinary(stream: StreamForRouting): keyof BinaryCapabil
 }
 
 export function canUseBinaryRoute(stream: StreamForRouting): boolean {
-  const required = getRequiredBinary(stream);
   const capabilities = getBinaryCapabilities();
-  return capabilities[required];
+
+  if (stream.status === 'live' && Boolean(stream.actualStart) && !stream.actualEnd) {
+    return capabilities.streamlink || capabilities.ytDlp;
+  }
+
+  if (stream.status === 'none' || stream.status === 'vod') {
+    return capabilities.ytDlp;
+  }
+
+  return capabilities.ffmpeg;
 }

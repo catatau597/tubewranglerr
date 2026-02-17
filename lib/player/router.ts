@@ -62,7 +62,7 @@ export function runFfmpegPlaceholder(stream: StreamForRouting, userAgent = 'Tube
 }
 
 export function runStreamlink(stream: StreamForRouting): ChildProcessWithoutNullStreams {
-  return spawn('streamlink', ['--stdout', stream.watchUrl, 'best']);
+  return spawn('streamlink', ['--stdout', '--hls-live-restart', stream.watchUrl, 'best']);
 }
 
 // Força o uso do downloader ffmpeg para reduzir buffering agressivo de VOD em disco/memória.
@@ -86,10 +86,15 @@ export function runYtDlp(stream: StreamForRouting): ChildProcessWithoutNullStrea
   return spawn('yt-dlp', buildYtDlpArgs(stream));
 }
 
-export function routeProcess(stream: StreamForRouting): ChildProcessWithoutNullStreams {
-  // Streamlink estava falhando com 403 em alguns lives; ytdlp+ffmpeg tem se mostrado mais resiliente.
+export type LiveEngine = 'streamlink' | 'yt-dlp';
+
+export function routeProcess(
+  stream: StreamForRouting,
+  options?: { liveEngine?: LiveEngine }
+): ChildProcessWithoutNullStreams {
   if (isGenuinelyLive(stream)) {
-    return runYtDlp(stream);
+    const engine = options?.liveEngine ?? 'streamlink';
+    return engine === 'yt-dlp' ? runYtDlp(stream) : runStreamlink(stream);
   }
 
   if (stream.status === 'none' || stream.status === 'vod') {

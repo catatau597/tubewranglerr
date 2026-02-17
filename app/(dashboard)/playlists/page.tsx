@@ -9,14 +9,17 @@ const copyToClipboard = (text: string) => {
   toast.success('Link copiado para a área de transferência!');
 };
 
-const appendSuffix = (filename: string, suffix: 'direct' | 'proxy') =>
-  filename.endsWith('.m3u8') ? filename.replace('.m3u8', `_${suffix}.m3u8`) : `${filename}_${suffix}`;
+const appendSuffix = (filename: string, suffix: 'direct' | 'proxy') => {
+  if (filename.endsWith('.m3u8')) return filename.replace('.m3u8', `_${suffix}.m3u8`);
+  if (filename.endsWith('.m3u')) return filename.replace('.m3u', `_${suffix}.m3u`);
+  return `${filename}_${suffix}`;
+};
 
 export default function PlaylistsPage() {
   const [baseUrl, setBaseUrl] = useState('');
-  const [playlistLive, setPlaylistLive] = useState('playlist_live.m3u8');
-  const [playlistUpcoming, setPlaylistUpcoming] = useState('playlist_upcoming.m3u8');
-  const [playlistVod, setPlaylistVod] = useState('playlist_vod.m3u8');
+  const [playlistLive, setPlaylistLive] = useState('playlist_live.m3u');
+  const [playlistUpcoming, setPlaylistUpcoming] = useState('playlist_upcoming.m3u');
+  const [playlistVod, setPlaylistVod] = useState('playlist_vod.m3u');
   const [epgFile, setEpgFile] = useState('youtube_epg.xml');
   const [generateDirect, setGenerateDirect] = useState(true);
   const [generateProxy, setGenerateProxy] = useState(true);
@@ -28,9 +31,9 @@ export default function PlaylistsPage() {
         const data = await res.json();
         const resolvedUrl = data.TUBEWRANGLERR_URL || window.location.origin;
         setBaseUrl(resolvedUrl);
-        setPlaylistLive(data.PLAYLIST_LIVE_FILENAME || 'playlist_live.m3u8');
-        setPlaylistUpcoming(data.PLAYLIST_UPCOMING_FILENAME || 'playlist_upcoming.m3u8');
-        setPlaylistVod(data.PLAYLIST_VOD_FILENAME || 'playlist_vod.m3u8');
+        setPlaylistLive(data.PLAYLIST_LIVE_FILENAME || 'playlist_live.m3u');
+        setPlaylistUpcoming(data.PLAYLIST_UPCOMING_FILENAME || 'playlist_upcoming.m3u');
+        setPlaylistVod(data.PLAYLIST_VOD_FILENAME || 'playlist_vod.m3u');
         setEpgFile(data.XMLTV_FILENAME || 'youtube_epg.xml');
         setGenerateDirect((data.PLAYLIST_GENERATE_DIRECT || 'true').toString().toLowerCase() === 'true');
         setGenerateProxy((data.PLAYLIST_GENERATE_PROXY || 'true').toString().toLowerCase() === 'true');
@@ -67,7 +70,6 @@ export default function PlaylistsPage() {
         {generateProxy && renderLinkCard('Live (Proxy)', `${baseUrl}/api/playlist/${appendSuffix(playlistLive, 'proxy')}`)}
         {generateDirect && renderLinkCard('Live (Direct)', `${baseUrl}/api/playlist/${appendSuffix(playlistLive, 'direct')}`)}
         {generateProxy && renderLinkCard('Upcoming (Proxy)', `${baseUrl}/api/playlist/${appendSuffix(playlistUpcoming, 'proxy')}`)}
-        {generateDirect && renderLinkCard('Upcoming (Direct)', `${baseUrl}/api/playlist/${appendSuffix(playlistUpcoming, 'direct')}`)}
         {generateProxy && renderLinkCard('VOD (Proxy)', `${baseUrl}/api/playlist/${appendSuffix(playlistVod, 'proxy')}`)}
         {generateDirect && renderLinkCard('VOD (Direct)', `${baseUrl}/api/playlist/${appendSuffix(playlistVod, 'direct')}`)}
         {renderLinkCard('Guia de Programação (EPG)', `${baseUrl}/api/playlist/${epgFile}`)}
