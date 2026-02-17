@@ -1,5 +1,6 @@
 import prisma from '@/lib/db';
 import { NextResponse } from 'next/server';
+import { assertAdminToken, assertRateLimit, toHttpErrorStatus } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    assertAdminToken(request);
+    assertRateLimit('channels-patch', 40, 60_000);
+
     const { id: channelId } = await params; // Pega o ID dos parâmetros da URL
     console.log(`[PATCH] Atualizando canal: ${channelId}`);
 
@@ -26,7 +30,7 @@ export async function PATCH(
     return NextResponse.json(updatedChannel);
   } catch (error) {
     console.error('Erro ao atualizar canal:', error);
-    return NextResponse.json({ error: 'Erro ao atualizar canal' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro ao atualizar canal' }, { status: toHttpErrorStatus(error) });
   }
 }
 
@@ -35,6 +39,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    assertAdminToken(request);
+    assertRateLimit('channels-delete', 20, 60_000);
+
     const { id: channelId } = await params; // Pega o ID dos parâmetros da URL
 
     if (!channelId) {
@@ -48,6 +55,6 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Erro ao deletar canal:', error);
-    return NextResponse.json({ error: 'Erro ao remover canal' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro ao remover canal' }, { status: toHttpErrorStatus(error) });
   }
 }

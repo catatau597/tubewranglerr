@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getBoolConfig, setConfig } from '@/lib/config';
+import { assertAdminToken, assertRateLimit, toHttpErrorStatus } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
+    assertAdminToken(req);
+    assertRateLimit('scheduler-toggle', 20, 60_000);
     // 1. Pega o estado atual
     const isCurrentlyPaused = await getBoolConfig('SCHEDULER_PAUSED', false);
     
@@ -20,7 +23,7 @@ export async function POST() {
     });
   } catch (error) {
     console.error('Erro ao alternar o estado do agendador:', error);
-    return NextResponse.json({ error: 'Erro ao alternar o estado do agendador.' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro ao alternar o estado do agendador.' }, { status: toHttpErrorStatus(error) });
   }
 }
 

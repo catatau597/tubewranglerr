@@ -1,5 +1,6 @@
 import prisma from '@/lib/db';
 import { NextResponse } from 'next/server';
+import { assertAdminToken, assertRateLimit, toHttpErrorStatus } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,9 @@ export async function GET() {
 // PUT: Atualiza uma configuração específica
 export async function PUT(req: Request) {
   try {
+    assertAdminToken(req);
+    assertRateLimit('config-put', 40, 60_000);
+
     const body = await req.json();
     const { key, value } = body;
 
@@ -39,6 +43,6 @@ export async function PUT(req: Request) {
     return NextResponse.json(updatedConfig);
   } catch (error) {
     console.error('Erro ao atualizar configuração:', error);
-    return NextResponse.json({ error: 'Erro interno ao atualizar configuração' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno ao atualizar configuração' }, { status: toHttpErrorStatus(error) });
   }
 }

@@ -1,6 +1,7 @@
 import prisma from '@/lib/db';
 import { NextResponse } from 'next/server';
 import { resolveChannel } from '@/lib/services/youtube';
+import { assertAdminToken, assertRateLimit, toHttpErrorStatus } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,6 +56,9 @@ export async function GET() {
 // POST: Adiciona um novo canal
 export async function POST(req: Request) {
   try {
+    assertAdminToken(req);
+    assertRateLimit('channels-post', 20, 60_000);
+
     const body = await req.json();
     const { handleOrId } = body;
 
@@ -85,7 +89,7 @@ export async function POST(req: Request) {
     if (error.code === 'P2002') { // Prisma unique constraint violation
       return NextResponse.json({ error: 'Este canal já foi adicionado.' }, { status: 409 });
     }
-    return NextResponse.json({ error: 'Erro interno ao adicionar canal.' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro interno ao adicionar canal.' }, { status: toHttpErrorStatus(error) });
   }
 }
 
