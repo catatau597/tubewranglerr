@@ -37,7 +37,7 @@ export async function startScheduler() {
 
   await logEvent('INFO', 'Scheduler', 'Scheduling main sync', { cronExpression });
 
-  const runSync = async () => {
+  cron.schedule(cronExpression, async () => {
     if (isJobInProgress) {
       await logEvent('WARN', 'Scheduler', 'Skipped cron execution because another run is in progress');
       return;
@@ -75,27 +75,5 @@ export async function startScheduler() {
       isJobInProgress = false;
       schedulerMetrics.inProgress = false;
     }
-  };
-
-  cron.schedule(cronExpression, runSync);
-
-  // Trigger immediate initial sync
-  await logEvent('INFO', 'Scheduler', 'Triggering immediate initial sync');
-  runSync().catch(err => console.error('Initial sync failed', err));
-}      await logEvent('INFO', 'Scheduler', 'Main sync completed');
-    } catch (error) {
-      schedulerMetrics.lastErrorAt = new Date().toISOString();
-      schedulerMetrics.lastErrorMessage = error instanceof Error ? error.message : String(error);
-      await logEvent('ERROR', 'Scheduler', 'Sync failed', { error: schedulerMetrics.lastErrorMessage });
-    } finally {
-      isJobInProgress = false;
-      schedulerMetrics.inProgress = false;
-    }
-  };
-
-  cron.schedule(cronExpression, runSync);
-
-  // Trigger immediate initial sync
-  await logEvent('INFO', 'Scheduler', 'Triggering immediate initial sync');
-  runSync().catch(err => console.error('Initial sync failed', err));
+  });
 }

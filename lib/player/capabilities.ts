@@ -40,7 +40,7 @@ export function getSmartPlayerMode(): SmartPlayerMode {
 
 export function getRequiredBinary(stream: StreamForRouting): keyof BinaryCapabilities {
   if (stream.status === 'live' && Boolean(stream.actualStart) && !stream.actualEnd) {
-    return 'streamlink';
+    return 'ytDlp';
   }
 
   if (stream.status === 'none' || stream.status === 'vod') {

@@ -87,8 +87,9 @@ export function runYtDlp(stream: StreamForRouting): ChildProcessWithoutNullStrea
 }
 
 export function routeProcess(stream: StreamForRouting): ChildProcessWithoutNullStreams {
+  // Streamlink estava falhando com 403 em alguns lives; ytdlp+ffmpeg tem se mostrado mais resiliente.
   if (isGenuinelyLive(stream)) {
-    return runStreamlink(stream);
+    return runYtDlp(stream);
   }
 
   if (stream.status === 'none' || stream.status === 'vod') {

@@ -139,15 +139,7 @@ export async function GET(
       if (proc !== child) return;
       clearTimeout(timeoutId);
       monitor.stop();
-<<<<<<< HEAD
-      controllerRef?.close();
-    });
-
-    proc.on('error', async (err) => {
-      await logEvent('ERROR', 'SmartPlayer', 'Spawn error', { videoId, error: err.message });
-      clearTimeout(timeoutId);
-      monitor.stop();
-      controllerRef?.error(err);
+      safeClose();
     });
 
     proc.on('error', async (err) => {
@@ -165,22 +157,7 @@ export async function GET(
   };
 
   await monitor.attach(videoId, child, () => routeProcess(streamForRouting), (proc) => {
-    // child is const, so we can't reassign it, but bindProcess works on the new proc instance
-    // The previous implementation used let child, but we changed to const. 
-    // However, for restart logic to work and to be able to kill the latest process on abort/timeout, 
-    // we need to keep track of the current active process. 
-    // Let's refactor to use a ref for the child process if we want to keep it const, or change it back to let.
-    // Changing back to let child at the top is cleaner for this specific logic.
-    // Reverting line 45 change from const child to let child.
-    
-    // Actually, looking at the previous step, I defined it as const child = ...
-    // I need to fix that first.
-    
-    // But for now, let's just apply the PR 13 logic which seems robust.
-    // The PR 13 logic expects child to be mutable or handled via callback.
-    // In the attach callback: (proc) => { child = proc; bindProcess(proc); }
-    // So child MUST be mutable.
-    
+    child = proc;
     bindProcess(proc);
   });
 
@@ -192,10 +169,7 @@ export async function GET(
       streamClosed = true;
       clearTimeout(timeoutId);
       monitor.stop();
-      // We need access to the current child process here.
-      // If child is immutable, we might be killing the old one if restart happened.
-      // But monitor.attach usually handles restarts internally? 
-      // No, monitor.attach takes a callback to update the external reference.
+      if (!child.killed) child.kill('SIGTERM');
     },
   });
 
