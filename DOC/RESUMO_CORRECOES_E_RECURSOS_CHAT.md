@@ -1,124 +1,97 @@
-# TubeWranglerr — Resumo das correções e adições feitas neste chat
+# TubeWranglerr — Resumo + auditoria de consistência das correções deste chat
 
-> Documento de consolidação das mudanças realizadas ao longo desta conversa, para facilitar revisão e merge.
+> Este documento foi revisado para refletir o estado **atual** do código no repositório.
 
-## 1) Escopo geral do que foi trabalhado
+## 1) Objetivo
 
-Durante a conversa, o foco foi evoluir o projeto em quatro frentes:
-
-1. **Estabilidade de build/deploy** (lint, build, Docker, seed/migrations).
-2. **Funcionalidade do Smart Player / playlists** (proxy, fallback, títulos M3U, regras de upcoming).
-3. **UI/UX do dashboard** (layout da sidebar, configurações, eventos, navegação de settings).
-4. **Confiabilidade operacional** (health checks, scheduler, logs básicos, proteções de endpoints).
+Consolidar as correções/adições discutidas no chat e marcar, de forma objetiva, o que está de fato implementado na versão atual dos arquivos.
 
 ---
 
-## 2) Principais correções implementadas
+## 2) Resultado da auditoria (estado atual)
 
-## 2.1 API e backend
+Legenda:
+- ✅ Implementado e encontrado no código atual.
+- ⚠️ Parcial/depende de configuração de ambiente.
 
-- Criação/ajuste de rotas importantes para o fluxo de canais e configuração:
-  - `POST /api/channels/[id]/sync`
-  - `GET /api/config/public`
-  - health checks (`/api/health/live` e `/api/health/ready`).
-- Ajustes em rotas de scheduler/cron e contratos de resposta para reduzir inconsistências.
-- Correções em serviços de sync do YouTube para reduzir inconsistências de status e retenção.
+| Área | Item auditado | Status | Evidência principal |
+|---|---|---:|---|
+| API | `POST /api/channels/[id]/sync` | ✅ | `app/api/channels/[id]/sync/route.ts` |
+| API | `GET /api/config/public` | ✅ | `app/api/config/public/route.ts` |
+| API | Health check liveness/readiness | ✅ | `app/api/health/live/route.ts`, `app/api/health/ready/route.ts` |
+| Smart Player | Rota `/api/stream/[id]` com timeout/abort/erros | ✅ | `app/api/stream/[id]/route.ts` |
+| Smart Player | Capabilities + health monitor | ✅ | `lib/player/capabilities.ts`, `lib/player/health-monitor.ts` |
+| Playlist | Upcoming apenas em modo proxy | ✅ | `app/api/playlist/[filename]/route.ts` |
+| Playlist | Lógica detalhada com `logEvent('Processing stream')` | ✅ | `app/api/playlist/[filename]/route.ts` |
+| Playlist | Escape de atributos M3U + opções de uppercase/tvg-name | ✅ | `app/api/playlist/[filename]/route.ts` |
+| Dashboard | Páginas de settings adicionais (`logs`, `mappings`, `system`) | ✅ | `app/(dashboard)/settings/*/page.tsx` |
+| Dashboard | Página de eventos funcional | ✅ | `app/(dashboard)/events/page.tsx` |
+| Observabilidade | Utilitário de logs | ✅ | `lib/observability.ts` |
+| Scheduler | Retry utilitário + ajustes scheduler | ✅ | `lib/retry.ts`, `lib/scheduler.ts` |
+| Segurança | Guardas administrativas iniciais | ✅ | `lib/security.ts` |
+| Testes | `player-router`, `retry`, `youtube-policy` | ✅ | `test/player-router.test.ts`, `test/retry.test.ts`, `test/youtube-policy.test.ts` |
+| Docker | Imagem com `ffmpeg`, `streamlink`, `yt-dlp` | ✅ | `Dockerfile` |
+| Runtime container | Migração + seed no entrypoint | ⚠️ | `entrypoint.sh` (depende de ambiente/DB/config) |
 
-## 2.2 Smart Player
+---
 
-- Endurecimento da rota `GET /api/stream/[id]` com:
+## 3) Correções e recursos consolidados
+
+## 3.1 API / backend
+
+- Inclusão e estabilização de endpoints de canais/config/scheduler/health para operação do painel.
+- Contratos de resposta e integração entre UI e API revisados para reduzir rotas quebradas.
+
+## 3.2 Smart Player
+
+- Rota de stream com tratamento explícito de:
   - timeout,
-  - tratamento de abort/cancel do cliente,
-  - tratamento de erros de spawn/execução,
-  - limpeza de processo em encerramento.
-- Estrutura de suporte adicionada para capacidades/monitoramento do player:
-  - `lib/player/capabilities.ts`
-  - `lib/player/health-monitor.ts`
-  - `lib/player/router.ts` (evoluções no roteamento).
+  - cancelamento/abort do cliente,
+  - erros de processo,
+  - fallback de modo.
+- Camada de suporte para capacidades dos binários e monitoramento/restart de processo.
 
-## 2.3 Playlists e EPG
+## 3.3 Playlist e EPG
 
-- Evolução da geração de playlist em `/api/playlist/[filename]`.
-- Regra mantida para **upcoming em modo proxy** (sem direct para upcoming).
-- Reforço da lógica detalhada de geração de título e atributos M3U (com escapes), incluindo:
-  - controle de uppercase,
-  - opção de usar display title no `tvg-name`,
-  - observabilidade de processamento por stream.
-- Estrutura de XMLTV/EPG evoluída para sair de placeholder em parte dos ciclos.
+- Geração de playlist mais robusta em `/api/playlist/[filename]`.
+- Regra mantida: **upcoming não tem modo direct**.
+- Fluxo detalhado de metadados M3U preservado (escape + uppercase + `tvg-name` opcional por display title).
+- XMLTV gerado dinamicamente pela rota da playlist quando solicitado pelo filename configurado.
 
-## 2.4 Dashboard / Front-end
+## 3.4 Dashboard e configurações
 
-- Reestruturação de telas de configuração por categorias/submenus.
-- Inclusão de páginas adicionais em settings (`logs`, `mappings`, `system`).
-- Ajustes de layout da sidebar e área de conteúdo para corrigir sobreposição/quebra visual.
-- Página de eventos evoluída de placeholder para listagem com filtros/paginação.
+- Navegação/settings reorganizados por áreas.
+- Páginas dedicadas para `logs`, `mappings` e `system` presentes.
+- Página de eventos evoluída para listagem com filtros/paginação.
 
-## 2.5 Observabilidade, segurança e scheduler
+## 3.5 Operação e qualidade
 
-- Inclusão de utilitário de logs (`lib/observability.ts`) e uso em pontos críticos.
-- Melhorias em scheduler e retry (`lib/retry.ts`, ajustes em `lib/scheduler.ts`).
-- Proteções administrativas iniciais (`lib/security.ts`) aplicadas em endpoints sensíveis.
-
-## 2.6 Qualidade, testes e tooling
-
-- Ajustes de lint com `eslint.config.mjs`.
-- Inclusão de testes unitários para partes críticas:
-  - `test/player-router.test.ts`
-  - `test/retry.test.ts`
-  - `test/youtube-policy.test.ts`
-- Ajustes em `package.json` para padronizar execução de testes/lint.
-
-## 2.7 Docker / execução em produção
-
-- Várias correções para build e runtime no Docker:
-  - preparação de DB,
-  - ajustes em prisma/migrations/seed,
-  - mudanças de entrypoint,
-  - cópia de arquivos necessários na imagem final,
-  - correções no comando de start/standalone.
+- Observabilidade básica (`lib/observability.ts`) aplicada em fluxos críticos.
+- Retry/scheduler com melhorias para maior robustez.
+- Testes unitários criados para blocos críticos do player/retry/política de sync.
+- Docker com dependências de mídia necessárias para smart-player.
 
 ---
 
-## 3) Arquivos e áreas mais impactados
+## 4) Decisão funcional importante validada
 
-- **API**: `app/api/**`
-- **Dashboard**: `app/(dashboard)/**`
-- **Player/Serviços**: `lib/player/**`, `lib/services/**`, `lib/scheduler.ts`, `lib/security.ts`
-- **Infra**: `Dockerfile`, `entrypoint.sh`, `package.json`, `eslint.config.mjs`
-- **Testes**: `test/**`
+Para reduzir regressão por conflitos de merge no playlist builder, o projeto mantém a **variante detalhada** (com escapes, opções de formatação e logs por stream), em vez da variante simplificada.
 
 ---
 
-## 4) Decisão funcional importante consolidada
+## 5) Pontos de atenção para homologação
 
-Para evitar regressão de merge no gerador de playlist:
-
-- foi priorizada a **lógica detalhada** de geração (com tratamento de atributos M3U, opções de formatação e logs),
-- e descartada a variante simplificada que estava sobreposta por conflito.
-
----
-
-## 5) Observações para revisão final
-
-1. Como houve um ciclo com muitos commits de correção rápida, recomenda-se revisar por blocos:
-   - player/playlist,
-   - settings/layout,
-   - docker/deploy.
-2. Validar no ambiente alvo (com variáveis reais) principalmente:
-   - `api/stream` (live/vod/upcoming),
-   - `api/playlist/*`,
-   - startup do container com prisma.
-3. Se necessário, podemos gerar um segundo documento com **checklist de homologação** (passo a passo) para operação.
+1. Validar em ambiente real os modos do smart-player (`binary`, `auto`, `redirect`) e disponibilidade dos binários no container.
+2. Validar fluxo completo de playlists (`live`, `upcoming`, `vod`) em players-alvo (Kodi/VLC/TS proxy).
+3. Confirmar startup do container com `prisma migrate deploy` + `prisma db seed` conforme política do seu deploy.
 
 ---
 
-## 6) Referência de commits recentes (linha do tempo curta)
+## 6) Referências de arquivos (auditoria)
 
-Exemplos de commits relevantes neste ciclo (ordem decrescente):
-
-- `5d1651c` — pacote amplo de correções/recursos (PR placeholder automático).
-- `ef04231` / `7e82992` — correções da página de Formato de Título.
-- `f6b9e38` / `c652f15` / `fb97932` / `f20ad4e` / `5e3af2a` / `1567b0c` / `647c528` — correções de build/deploy Docker/Prisma.
-- `26cb29e` / `5b99506` / `feff4be` / `44d03a1` / `7712b9d` — ciclo de implementação/correções de UI + backend.
-
-> Se você quiser, eu também posso transformar este resumo em **CHANGELOG por categoria** (Added / Changed / Fixed / Breaking) para publicar junto com release.
+- API: `app/api/**`
+- Dashboard: `app/(dashboard)/**`
+- Player: `lib/player/**`
+- Serviços/scheduler/segurança: `lib/services/**`, `lib/scheduler.ts`, `lib/security.ts`, `lib/observability.ts`
+- Infra: `Dockerfile`, `entrypoint.sh`, `package.json`, `eslint.config.mjs`
+- Testes: `test/**`
