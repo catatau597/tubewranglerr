@@ -211,47 +211,6 @@ export default function ConfigList({ initialConfigs }: { initialConfigs: ConfigI
 
   return (
     <div className="space-y-6">
-      {/* Bloco de configuração de User-Agent */}
-      <div className="bg-muted rounded-lg p-4 flex flex-col gap-2">
-        <div className="font-semibold">User-Agent global</div>
-        <div className="flex gap-2 items-center">
-          <select
-            className="border rounded px-2 py-1"
-            value={userAgentConfig?.value || ''}
-            onChange={(e) => handleSave('USER_AGENT', e.target.value)}
-            disabled={loading === 'USER_AGENT'}
-          >
-            <option value="">Selecione um user-agent...</option>
-            {USER_AGENT_PRESETS.map((ua) => (
-              <option key={ua.label} value={ua.value}>{ua.label}</option>
-            ))}
-          </select>
-          <input
-            className="flex-1 border rounded px-2 py-1"
-            placeholder="Ou digite um user-agent personalizado"
-            value={userAgentConfig?.value || ''}
-            onChange={(e) => handleSave('USER_AGENT', e.target.value)}
-            disabled={loading === 'USER_AGENT'}
-          />
-        </div>
-      </div>
-
-      {/* Bloco de upload de cookies.txt */}
-      <div className="bg-muted rounded-lg p-4 flex flex-col gap-2">
-        <div className="font-semibold">Cookies.txt global</div>
-        <div className="flex gap-2 items-center">
-          <input
-            type="file"
-            accept=".txt"
-            ref={cookiesInputRef}
-            onChange={handleCookiesUpload}
-            disabled={loading === 'COOKIES_TXT'}
-          />
-          {cookiesConfig?.value && (
-            <span className="text-xs text-muted-foreground">Cookies carregados ({cookiesConfig.value.length} chars)</span>
-          )}
-        </div>
-      </div>
       {sortedGroupedEntries.map(([category, items]) => (
         <div key={category} className="rounded-xl border bg-card text-card-foreground shadow p-6">
           <h3 className="text-lg font-semibold leading-none tracking-tight mb-4">{category}</h3>
