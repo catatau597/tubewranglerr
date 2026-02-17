@@ -4,6 +4,7 @@ import { getBoolConfig, getConfig } from '@/lib/config';
 import { TitleComponent } from '@/app/(dashboard)/settings/title-format/page';
 import { logEvent } from '@/lib/observability';
 
+// Interfaces
 interface TitleFormatConfig {
   components: TitleComponent[];
   useBrackets: boolean;
@@ -31,6 +32,7 @@ interface StreamWithChannel {
   createdAt: Date;
 }
 
+// Utilitários
 function xmlEscape(input: string) {
   return input
     .replace(/&/g, '&amp;')
@@ -58,35 +60,22 @@ function parseMappingConfig(value: string): Record<string, string> {
   return result;
 }
 
-function formatDateTimeShort(dateInput: Date | string | null | undefined): string {
-  if (!dateInput) return '';
-  const date = new Date(dateInput);
-  if (isNaN(date.getTime())) return '';
-  
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  
-  return `${day}/${month} ${hours}:${minutes}`;
-}
-
 function cleanTitle(title: string, filters: string[]): string {
     let cleaned = title;
-    
     for (const filter of filters) {
         if (!filter) continue;
         const escapedFilter = filter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(escapedFilter, 'gi');
         cleaned = cleaned.replace(regex, '');
     }
-    
-    cleaned = cleaned
-        .replace(/[|]/g, ' - ')
-        .replace(/\s+/g, ' ')
-        .trim();
-        
-    return cleaned;
+    return cleaned.replace(/[|]/g, ' - ').replace(/\s+/g, ' ').trim();
+}
+
+function formatDateTimeShort(date: Date | null | undefined): string {
+    if (!date) return '';
+    return new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+    }).format(date);
 }
 
 function escapeAttribute(val: string): string {
@@ -135,6 +124,8 @@ const generateDisplayTitle = (
   return titleParts.join(' ');
 };
 
+
+// Main Route Handler
 export async function GET(req: Request, { params }: { params: Promise<{ filename: string }> }) {
   const { filename } = await params;
 
@@ -164,7 +155,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     getConfig('XMLTV_FILENAME', 'youtube_epg.xml'),
     getConfig('TUBEWRANGLERR_URL', ''),
     getBoolConfig('KEEP_RECORDED_STREAMS', true),
-    getBoolConfig('USE_INVISIBLE_PLACEHOLDER', false),
+    getBoolConfig('PLAYLIST_USE_INVISIBLE_PLACEHOLDER', false),
     getBoolConfig('PLAYLIST_GENERATE_DIRECT', true),
     getBoolConfig('PLAYLIST_GENERATE_PROXY', true),
     getConfig('TITLE_FORMAT_CONFIG'),
@@ -178,9 +169,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     getBoolConfig('FORCE_UPPERCASE_TITLE', false),
   ]);
 
-  const categoryMappings = parseMappingConfig(categoryMappingsStr);
-  const channelMappings = parseMappingConfig(channelMappingsStr);
-  const titleFilters = titleFilterExpressionsStr ? titleFilterExpressionsStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const categoryMappings = typeof categoryMappingsStr === 'string' && categoryMappingsStr.length > 0 ? parseMappingConfig(categoryMappingsStr) : {};
+  const channelMappings = typeof channelMappingsStr === 'string' && channelMappingsStr.length > 0 ? parseMappingConfig(channelMappingsStr) : {};
+  const titleFilters = typeof titleFilterExpressionsStr === 'string' && titleFilterExpressionsStr.length > 0
+    ? titleFilterExpressionsStr.split(',').map((s: string) => s.trim()).filter(Boolean)
+    : [];
 
   const mode: 'direct' | 'proxy' = filename.includes('_direct') ? 'direct' : 'proxy';
 
@@ -239,8 +232,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
       headers: { 'Content-Type': 'application/vnd.apple.mpegurl' },
     });
   }
-<<<<<<< HEAD
-
   if (mode === 'direct' && !generateDirect) {
     return NextResponse.json({ error: 'Playlist direta desativada' }, { status: 404 });
   }
@@ -338,13 +329,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     // Log category for debugging mapping issues
     await logEvent('DEBUG', 'Playlist', `Processing stream: ${stream.title}`, { categoryId: stream.categoryYoutube, categoryName, groupTitle });
     const displayTitle = generateDisplayTitle(
-        stream,
-        mappedChannelName,
-        titleConfig,
-        statusLabel,
-        prefixWithStatus,
-        prefixWithChannel,
-        titleFilters
+      stream,
+      mappedChannelName,
+      titleConfig,
+      statusLabel,
+      prefixWithStatus,
+      prefixWithChannel,
+      titleFilters
     );
     // TVG Name Logic: Use Display Title if configured, else use Channel Name
     let tvgName = tvgNameUseDisplayTitle ? displayTitle : mappedChannelName;
