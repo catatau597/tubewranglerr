@@ -315,13 +315,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
   for (const stream of streams) {
     const mappedChannelName = channelMappings[stream.channel.title] || stream.channel.customName || stream.channel.title;
     const statusLabel = stream.status === 'live' ? 'LIVE 🔴' : stream.status === 'upcoming' ? 'AGENDADO' : 'GRAVADO';
-    
     // Resolve Category Name from ID
     let categoryName = 'Geral';
     if (stream.categoryYoutube && youtubeCategories[stream.categoryYoutube]) {
       categoryName = youtubeCategories[stream.categoryYoutube];
     }
-
     // Determine Group Title:
     // 1. Try mapping by ID (e.g. "17" -> "Esportes")
     // 2. Try mapping by Name (e.g. "Sports" -> "Esportes")
@@ -329,102 +327,42 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     // 4. Fallback to mappedChannelName if category is unknown/missing
     let groupTitle = mappedChannelName;
     if (stream.categoryYoutube) {
-        // Try exact ID match first
         if (categoryMappings[stream.categoryYoutube]) {
             groupTitle = categoryMappings[stream.categoryYoutube];
-        } 
-        // Try Name match next (if ID resolves to a name)
-        else if (categoryName !== 'Geral' && categoryMappings[categoryName]) {
+        } else if (categoryName !== 'Geral' && categoryMappings[categoryName]) {
             groupTitle = categoryMappings[categoryName];
-        }
-        // Fallback to the resolved English name (e.g. "Sports")
-        else if (categoryName !== 'Geral') {
+        } else if (categoryName !== 'Geral') {
              groupTitle = categoryName;
         }
     }
-
     // Log category for debugging mapping issues
     await logEvent('DEBUG', 'Playlist', `Processing stream: ${stream.title}`, { categoryId: stream.categoryYoutube, categoryName, groupTitle });
-
-=======
-
-
-  if (targetStatus === 'upcoming' && mode === 'direct') {
-    return NextResponse.json(
-      { error: 'Playlist upcoming suporta apenas modo proxy' },
-      { status: 404 }
-    );
-  }
-
-  if (mode === 'direct' && !generateDirect) {
-    return NextResponse.json({ error: 'Playlist direta desativada' }, { status: 404 });
-  }
-  if (mode === 'proxy' && !generateProxy) {
-    return NextResponse.json({ error: 'Playlist proxy desativada' }, { status: 404 });
-  }
-
-  const streams = await prisma.stream.findMany({
-    where: { status: targetStatus },
-    include: { channel: true },
-    orderBy: [{ scheduledStart: 'asc' }, { createdAt: 'desc' }],
-  });
-
-  const titleConfig: TitleFormatConfig = titleConfigStr
-    ? JSON.parse(titleConfigStr)
-    : { components: [], useBrackets: true };
-
-  const origin = new URL(req.url).origin;
-  const appBaseUrl = configuredBaseUrl || origin;
-
-  const m3uLines = ['#EXTM3U', '#EXT-X-VERSION:3', '#EXT-X-TARGETDURATION:10'];
-
-  for (const stream of streams) {
-    const mappedChannelName = channelMappings[stream.channel.title] || stream.channel.customName || stream.channel.title;
-    const statusLabel = stream.status === 'live' ? 'LIVE 🔴' : stream.status === 'upcoming' ? 'AGENDADO' : 'GRAVADO';
-    const groupTitle = stream.categoryYoutube ? categoryMappings[stream.categoryYoutube] || mappedChannelName : mappedChannelName;
->>>>>>> pr-13
     const displayTitle = generateDisplayTitle(
-      stream,
-      mappedChannelName,
-      titleConfig,
-      statusLabel,
-      prefixWithStatus,
-      prefixWithChannel,
-<<<<<<< HEAD
-      titleFilters
+        stream,
+        mappedChannelName,
+        titleConfig,
+        statusLabel,
+        prefixWithStatus,
+        prefixWithChannel,
+        titleFilters
     );
-
     // TVG Name Logic: Use Display Title if configured, else use Channel Name
     let tvgName = tvgNameUseDisplayTitle ? displayTitle : mappedChannelName;
-
     // Apply Uppercase Filters
     if (forceUppercaseGroupTitle) {
-      groupTitle = groupTitle.toUpperCase();
+        groupTitle = groupTitle.toUpperCase();
     }
-    
     // For Display Title (which appears at end of line) and TVG Name
     let finalDisplayTitle = displayTitle;
-    
     if (forceUppercaseTitle) {
-       tvgName = tvgName.toUpperCase();
-       finalDisplayTitle = finalDisplayTitle.toUpperCase();
+        tvgName = tvgName.toUpperCase();
+        finalDisplayTitle = finalDisplayTitle.toUpperCase();
     }
-
     const outputUrl = mode === 'direct' ? stream.watchUrl : `${appBaseUrl}/api/stream/${stream.videoId}`;
-
     await logEvent('DEBUG', 'Playlist', `Stream added to M3U`, { displayTitle: finalDisplayTitle, outputUrl });
-
     // Use escapeAttribute to safely quote attributes
     m3uLines.push(
-      `#EXTINF:-1 tvg-id="${escapeAttribute(stream.channel.id)}" tvg-name="${escapeAttribute(tvgName)}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${escapeAttribute(groupTitle)}",${finalDisplayTitle}`,
-=======
-    );
-
-    const outputUrl = mode === 'direct' ? stream.watchUrl : `${appBaseUrl}/api/stream/${stream.videoId}`;
-
-    m3uLines.push(
-      `#EXTINF:-1 tvg-id="${stream.channel.id}" tvg-name="${mappedChannelName}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${groupTitle}",${displayTitle}`,
->>>>>>> pr-13
+        `#EXTINF:-1 tvg-id="${escapeAttribute(stream.channel.id)}" tvg-name="${escapeAttribute(tvgName)}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${escapeAttribute(groupTitle)}",${finalDisplayTitle}`,
     );
     m3uLines.push(outputUrl);
   }
@@ -436,7 +374,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
 
   const m3uContent = m3uLines.join('\n');
 
-<<<<<<< HEAD
   // Use .m3u and audio/x-mpegurl for ALL playlists to ensure maximum compatibility (VLC, IPTV players).
   // Even for proxy mode (which links to HLS), a simple .m3u playlist is more widely supported as a channel list.
   const fileExtension = 'm3u';
@@ -445,8 +382,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
   // Ensure filename has correct extension if not already present or replace it
   const downloadFilename = filename.replace(/\.(m3u|m3u8)$/, '') + `.${fileExtension}`;
 
-=======
->>>>>>> pr-13
   return new NextResponse(m3uContent, {
     headers: {
       'Content-Type': contentType,
