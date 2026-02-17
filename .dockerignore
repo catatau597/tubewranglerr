@@ -6,8 +6,3 @@ README.md
 .next
 .git
 # .env NÃO deve ser ignorado para build Docker
-.env
-.env.local
-.env.*
-!.env
-!.env.example
