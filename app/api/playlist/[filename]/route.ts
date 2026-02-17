@@ -71,13 +71,11 @@ function normalizeListValue(value: string, uppercase: boolean): string {
 }
 
 function appendSuffix(filename: string, suffix: 'direct' | 'proxy') {
-  if (filename.endsWith('.m3u8')) {
-    return filename.replace('.m3u8', `_${suffix}.m3u8`);
-  }
+  // Sempre força .m3u
   if (filename.endsWith('.m3u')) {
     return filename.replace('.m3u', `_${suffix}.m3u`);
   }
-  return `${filename}_${suffix}`;
+  return `${filename}_${suffix}.m3u`;
 }
 
 const generateDisplayTitle = (
@@ -163,18 +161,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
 
   const mode: 'direct' | 'proxy' = filename.includes('_direct.') ? 'direct' : 'proxy';
 
-  const liveDirectFilename = appendSuffix(liveFilename, 'direct');
-  const liveProxyFilename = appendSuffix(liveFilename, 'proxy');
-  const upcomingProxyFilename = appendSuffix(upcomingFilename, 'proxy');
-  const vodDirectFilename = appendSuffix(vodFilename, 'direct');
-  const vodProxyFilename = appendSuffix(vodFilename, 'proxy');
-
+  // Só aceita .m3u
   let targetStatus: 'live' | 'upcoming' | 'none' | null = null;
-  if (filename === liveFilename || filename === liveDirectFilename || filename === liveProxyFilename) {
+  if (filename === liveFilename || filename === appendSuffix(liveFilename, 'direct') || filename === appendSuffix(liveFilename, 'proxy')) {
     targetStatus = 'live';
-  } else if (filename === upcomingFilename || filename === upcomingProxyFilename) {
+  } else if (filename === upcomingFilename || filename === appendSuffix(upcomingFilename, 'proxy')) {
     targetStatus = 'upcoming';
-  } else if (filename === vodFilename || filename === vodDirectFilename || filename === vodProxyFilename) {
+  } else if (filename === vodFilename || filename === appendSuffix(vodFilename, 'direct') || filename === appendSuffix(vodFilename, 'proxy')) {
     targetStatus = 'none';
   } else if (filename === xmltvFilename) {
     const epgStreams = await prisma.stream.findMany({
@@ -260,7 +253,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
   const origin = new URL(req.url).origin;
   const appBaseUrl = configuredBaseUrl || origin;
 
-  const m3uLines = ['#EXTM3U', '#EXT-X-VERSION:3', '#EXT-X-TARGETDURATION:10'];
+  const m3uLines = ['#EXTM3U'];
 
   for (const stream of filteredStreams) {
     const mappedChannelName = channelMappings[stream.channel.title] || stream.channel.customName || stream.channel.title;
@@ -305,8 +298,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
 
   const m3uContent = m3uLines.join('\n');
 
-  const contentType = 'application/vnd.apple.mpegurl';
-  const downloadFilename = filename;
+  // Força sempre .m3u e content-type correto
+  const contentType = 'audio/x-mpegurl';
+  const downloadFilename = filename.endsWith('.m3u') ? filename : `${filename}.m3u`;
 
   return new NextResponse(m3uContent, {
     headers: {
