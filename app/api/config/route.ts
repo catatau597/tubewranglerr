@@ -35,12 +35,18 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'Campos key e value são obrigatórios' }, { status: 400 });
     }
 
-    const updatedConfig = await prisma.config.update({
+    const upsertedConfig = await prisma.config.upsert({
       where: { key },
-      data: { value: String(value) }
+      update: { value: String(value) },
+      create: {
+        key,
+        value: String(value),
+        type: 'string', // ou defina conforme necessário
+        category: 'API & Canais', // ou defina conforme necessário
+        description: null,
+      },
     });
-
-    return NextResponse.json(updatedConfig);
+    return NextResponse.json(upsertedConfig);
   } catch (error) {
     console.error('Erro ao atualizar configuração:', error);
     return NextResponse.json({ error: 'Erro interno ao atualizar configuração' }, { status: toHttpErrorStatus(error) });

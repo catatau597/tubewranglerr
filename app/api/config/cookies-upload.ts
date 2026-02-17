@@ -1,27 +1,16 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import fs from 'fs';
+import { NextResponse } from 'next/server';
+import { writeFile } from 'fs/promises';
 import path from 'path';
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).end('Method Not Allowed');
+export async function POST(req: Request) {
+  try {
+    const data = await req.arrayBuffer();
+    const buffer = Buffer.from(data);
+    const cookiesDir = path.resolve(process.cwd(), 'app');
+    const cookiesPath = path.join(cookiesDir, 'cookies.txt');
+    await writeFile(cookiesPath, buffer);
+    return NextResponse.json({ success: true, path: cookiesPath });
+  } catch (error) {
+    return NextResponse.json({ error: 'Erro ao salvar cookies.txt' }, { status: 500 });
   }
-
-  // Salva cookies.txt no diretório /app
-  const cookiesDir = path.resolve(process.cwd(), 'app');
-  const cookiesPath = path.join(cookiesDir, 'cookies.txt');
-
-  const chunks: Buffer[] = [];
-  req.on('data', chunk => chunks.push(chunk));
-  req.on('end', () => {
-    const buffer = Buffer.concat(chunks);
-    fs.writeFileSync(cookiesPath, buffer);
-    res.status(200).json({ success: true, path: cookiesPath });
-  });
 }
