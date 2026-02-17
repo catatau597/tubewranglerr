@@ -37,7 +37,11 @@ export async function startScheduler() {
 
   await logEvent('INFO', 'Scheduler', 'Scheduling main sync', { cronExpression });
 
+<<<<<<< HEAD
   cron.schedule(cronExpression, async () => {
+=======
+  const runSync = async () => {
+>>>>>>> main
     if (isJobInProgress) {
       await logEvent('WARN', 'Scheduler', 'Skipped cron execution because another run is in progress');
       return;
@@ -49,6 +53,34 @@ export async function startScheduler() {
     if (isPaused) {
       await logEvent('INFO', 'Scheduler', 'Sync is paused. Skipping execution.');
       return;
+<<<<<<< HEAD
+    }
+
+    isJobInProgress = true;
+    schedulerMetrics.inProgress = true;
+
+    await logEvent('INFO', 'Scheduler', 'Running main sync');
+    try {
+      const retryAttempts = await getIntConfig('SCHEDULER_RETRY_ATTEMPTS', 2);
+      const retryBaseDelayMs = await getIntConfig('SCHEDULER_RETRY_BASE_DELAY_MS', 1000);
+
+      await withRetry(async () => {
+        await syncChannels();
+        await syncStreams();
+      }, { retries: retryAttempts, baseDelayMs: retryBaseDelayMs, jitterMs: 250 });
+      schedulerMetrics.lastSuccessAt = new Date().toISOString();
+      schedulerMetrics.lastErrorAt = null;
+      schedulerMetrics.lastErrorMessage = null;
+      await logEvent('INFO', 'Scheduler', 'Main sync completed');
+    } catch (error) {
+      schedulerMetrics.lastErrorAt = new Date().toISOString();
+      schedulerMetrics.lastErrorMessage = error instanceof Error ? error.message : String(error);
+      await logEvent('ERROR', 'Scheduler', 'Sync failed', { error: schedulerMetrics.lastErrorMessage });
+    } finally {
+      isJobInProgress = false;
+      schedulerMetrics.inProgress = false;
+=======
+>>>>>>> main
     }
 
     isJobInProgress = true;
@@ -75,5 +107,27 @@ export async function startScheduler() {
       isJobInProgress = false;
       schedulerMetrics.inProgress = false;
     }
-  });
+  };
+
+  cron.schedule(cronExpression, runSync);
+
+  // Trigger immediate initial sync
+  await logEvent('INFO', 'Scheduler', 'Triggering immediate initial sync');
+  runSync().catch(err => console.error('Initial sync failed', err));
+}      await logEvent('INFO', 'Scheduler', 'Main sync completed');
+    } catch (error) {
+      schedulerMetrics.lastErrorAt = new Date().toISOString();
+      schedulerMetrics.lastErrorMessage = error instanceof Error ? error.message : String(error);
+      await logEvent('ERROR', 'Scheduler', 'Sync failed', { error: schedulerMetrics.lastErrorMessage });
+    } finally {
+      isJobInProgress = false;
+      schedulerMetrics.inProgress = false;
+    }
+  };
+
+  cron.schedule(cronExpression, runSync);
+
+  // Trigger immediate initial sync
+  await logEvent('INFO', 'Scheduler', 'Triggering immediate initial sync');
+  runSync().catch(err => console.error('Initial sync failed', err));
 }

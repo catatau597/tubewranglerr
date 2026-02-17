@@ -70,6 +70,7 @@ export default function DashboardLayout({
   };
 
   const sidebarCurrentWidth = isSidebarCollapsed ? 80 : sidebarWidth;
+<<<<<<< HEAD
   const gridTemplateColumns = `${sidebarCurrentWidth}px 4px minmax(0, 1fr)`;
 
   return (
@@ -77,6 +78,15 @@ export default function DashboardLayout({
       <div className="grid h-screen w-full" style={{ gridTemplateColumns }}>
         <aside
           className="hidden shrink-0 border-r bg-muted/40 md:block"
+=======
+
+  return (
+    <>
+      <div className="flex h-screen w-full transition-all duration-150">
+        <aside 
+          className="hidden shrink-0 border-r bg-muted/40 md:block transition-[width] duration-300 ease-in-out"
+          style={{ width: sidebarCurrentWidth }}
+>>>>>>> main
         >
           <div className="flex h-full max-h-screen flex-col gap-2">
             <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
@@ -157,9 +167,15 @@ export default function DashboardLayout({
           </div>
         </aside>
 
+<<<<<<< HEAD
         <div className="relative hidden cursor-col-resize hover:bg-primary/30 md:block" onMouseDown={startResizing} />
 
         <div className="flex min-w-0 flex-1 flex-col">
+=======
+        <div className="relative hidden w-1 cursor-col-resize hover:bg-primary/30 md:block" onMouseDown={startResizing} />
+
+        <div className="flex flex-1 flex-col min-w-0">
+>>>>>>> main
           <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
             <button
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}

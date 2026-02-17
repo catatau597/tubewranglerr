@@ -159,7 +159,10 @@ export async function syncStreams() {
   const channels = await prisma.channel.findMany({ where: { isActive: true } });
   const initialSyncDays = await getIntConfig('INITIAL_SYNC_DAYS', 2);
   const keepRecordedStreams = await getBoolConfig('KEEP_RECORDED_STREAMS', true);
+<<<<<<< HEAD
 
+=======
+>>>>>>> main
   const usePlaylistItems = await getBoolConfig('USE_PLAYLIST_ITEMS', true);
   const filterByCategory = await getBoolConfig('FILTER_BY_CATEGORY', false);
   const allowedCategories = filterByCategory ? await getListConfig('ALLOWED_CATEGORY_IDS') : [];
