@@ -112,11 +112,19 @@ const generateDisplayTitle = (
 export async function GET(req: Request, { params }: { params: Promise<{ filename: string }> }) {
   const { filename } = await params;
 
+  // Permitir apenas padrões playlist_<tipo>_<modo>.m3u e epg.xml
+  const isPlaylist = /^playlist_(live|vod|upcoming)_(direct|proxy)\.m3u$/.test(filename);
+  const isEpg = filename === 'epg.xml';
+  if (!isPlaylist && !isEpg) {
+    return NextResponse.json({ error: 'Recurso não encontrado' }, { status: 404 });
+  }
+
+  // Nomes fixos padronizados
+  const liveFilename = 'playlist_live.m3u';
+  const upcomingFilename = 'playlist_upcoming.m3u';
+  const vodFilename = 'playlist_vod.m3u';
+  const xmltvFilename = 'epg.xml';
   const [
-    liveFilename,
-    upcomingFilename,
-    vodFilename,
-    xmltvFilename,
     configuredBaseUrl,
     keepRecorded,
     useInvisiblePlaceholder,
@@ -134,10 +142,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     maxUpcomingPerChannel,
     placeholderImageUrl,
   ] = await Promise.all([
-    getConfig('PLAYLIST_LIVE_FILENAME', 'playlist_live.m3u'),
-    getConfig('PLAYLIST_UPCOMING_FILENAME', 'playlist_upcoming.m3u'),
-    getConfig('PLAYLIST_VOD_FILENAME', 'playlist_vod.m3u'),
-    getConfig('XMLTV_FILENAME', 'youtube_epg.xml'),
     getConfig('TUBEWRANGLERR_URL', ''),
     getBoolConfig('KEEP_RECORDED_STREAMS', true),
     getBoolConfig('USE_INVISIBLE_PLACEHOLDER', false),
@@ -154,22 +158,23 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     getConfig('MAX_SCHEDULE_HOURS', '72'),
     getConfig('MAX_UPCOMING_PER_CHANNEL', '6'),
     getConfig('PLACEHOLDER_IMAGE_URL', ''),
-  ]);
+  ];
 
   const categoryMappings = parseMappingConfig(categoryMappingsStr);
   const channelMappings = parseMappingConfig(channelMappingsStr);
 
-  const mode: 'direct' | 'proxy' = filename.includes('_direct.') ? 'direct' : 'proxy';
+  let mode: 'direct' | 'proxy' = 'proxy';
+  if (filename.includes('_direct.')) mode = 'direct';
 
   // Só aceita .m3u
   let targetStatus: 'live' | 'upcoming' | 'none' | null = null;
-  if (filename === liveFilename || filename === appendSuffix(liveFilename, 'direct') || filename === appendSuffix(liveFilename, 'proxy')) {
+  if (filename === 'playlist_live_direct.m3u' || filename === 'playlist_live_proxy.m3u') {
     targetStatus = 'live';
-  } else if (filename === upcomingFilename || filename === appendSuffix(upcomingFilename, 'proxy')) {
+  } else if (filename === 'playlist_upcoming_proxy.m3u') {
     targetStatus = 'upcoming';
-  } else if (filename === vodFilename || filename === appendSuffix(vodFilename, 'direct') || filename === appendSuffix(vodFilename, 'proxy')) {
+  } else if (filename === 'playlist_vod_direct.m3u' || filename === 'playlist_vod_proxy.m3u') {
     targetStatus = 'none';
-  } else if (filename === xmltvFilename) {
+  } else if (filename === 'epg.xml') {
     const epgStreams = await prisma.stream.findMany({
       where: { status: { in: ['live', 'upcoming', 'none'] } },
       include: { channel: true },

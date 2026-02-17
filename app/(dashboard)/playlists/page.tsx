@@ -9,18 +9,18 @@ const copyToClipboard = (text: string) => {
   toast.success('Link copiado para a área de transferência!');
 };
 
-const appendSuffix = (filename: string, suffix: 'direct' | 'proxy') => {
-  if (filename.endsWith('.m3u8')) return filename.replace('.m3u8', `_${suffix}.m3u8`);
-  if (filename.endsWith('.m3u')) return filename.replace('.m3u', `_${suffix}.m3u`);
-  return `${filename}_${suffix}`;
+const appendSuffix = (base: string, suffix: 'direct' | 'proxy') => {
+  // Sempre retorna padrão playlist_<tipo>_<suffix>.m3u
+  return `playlist_${base}_${suffix}.m3u`;
 };
 
 export default function PlaylistsPage() {
   const [baseUrl, setBaseUrl] = useState('');
-  const [playlistLive, setPlaylistLive] = useState('playlist_live.m3u');
-  const [playlistUpcoming, setPlaylistUpcoming] = useState('playlist_upcoming.m3u');
-  const [playlistVod, setPlaylistVod] = useState('playlist_vod.m3u');
-  const [epgFile, setEpgFile] = useState('youtube_epg.xml');
+  // Usar nomes fixos padronizados
+  const playlistLive = 'live';
+  const playlistUpcoming = 'upcoming';
+  const playlistVod = 'vod';
+  const epgFile = 'epg.xml';
   const [generateDirect, setGenerateDirect] = useState(true);
   const [generateProxy, setGenerateProxy] = useState(true);
 
@@ -31,10 +31,7 @@ export default function PlaylistsPage() {
         const data = await res.json();
         const resolvedUrl = data.TUBEWRANGLERR_URL || window.location.origin;
         setBaseUrl(resolvedUrl);
-        setPlaylistLive(data.PLAYLIST_LIVE_FILENAME || 'playlist_live.m3u');
-        setPlaylistUpcoming(data.PLAYLIST_UPCOMING_FILENAME || 'playlist_upcoming.m3u');
-        setPlaylistVod(data.PLAYLIST_VOD_FILENAME || 'playlist_vod.m3u');
-        setEpgFile(data.XMLTV_FILENAME || 'youtube_epg.xml');
+        // Nomes fixos, não sobrescreve
         setGenerateDirect((data.PLAYLIST_GENERATE_DIRECT || 'true').toString().toLowerCase() === 'true');
         setGenerateProxy((data.PLAYLIST_GENERATE_PROXY || 'true').toString().toLowerCase() === 'true');
       } else {
@@ -67,12 +64,12 @@ export default function PlaylistsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {generateProxy && renderLinkCard('Live (Proxy)', `${baseUrl}/api/playlist/${appendSuffix(playlistLive, 'proxy')}`)}
-        {generateDirect && renderLinkCard('Live (Direct)', `${baseUrl}/api/playlist/${appendSuffix(playlistLive, 'direct')}`)}
-        {generateProxy && renderLinkCard('Upcoming (Proxy)', `${baseUrl}/api/playlist/${appendSuffix(playlistUpcoming, 'proxy')}`)}
-        {generateProxy && renderLinkCard('VOD (Proxy)', `${baseUrl}/api/playlist/${appendSuffix(playlistVod, 'proxy')}`)}
-        {generateDirect && renderLinkCard('VOD (Direct)', `${baseUrl}/api/playlist/${appendSuffix(playlistVod, 'direct')}`)}
-        {renderLinkCard('Guia de Programação (EPG)', `${baseUrl}/api/playlist/${epgFile}`)}
+        {generateProxy && renderLinkCard('Live (Proxy)', `${baseUrl}/api/playlist_${playlistLive}_proxy.m3u`)}
+        {generateDirect && renderLinkCard('Live (Direct)', `${baseUrl}/api/playlist_${playlistLive}_direct.m3u`)}
+        {generateProxy && renderLinkCard('Upcoming (Proxy)', `${baseUrl}/api/playlist_${playlistUpcoming}_proxy.m3u`)}
+        {generateProxy && renderLinkCard('VOD (Proxy)', `${baseUrl}/api/playlist_${playlistVod}_proxy.m3u`)}
+        {generateDirect && renderLinkCard('VOD (Direct)', `${baseUrl}/api/playlist_${playlistVod}_direct.m3u`)}
+        {renderLinkCard('Guia de Programação (EPG)', `${baseUrl}/api/epg.xml`)}
       </div>
 
       <div className="rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
