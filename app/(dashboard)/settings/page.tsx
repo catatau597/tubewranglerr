@@ -1,7 +1,6 @@
 import prisma from '@/lib/db';
 import ConfigList from './ConfigList';
-import dynamic from 'next/dynamic';
-const SettingsClientBlocks = dynamic(() => import('./SettingsClientBlocks'), { ssr: false });
+import SettingsClientBlocks from './SettingsClientBlocks';
 
 export const forceDynamic = 'force-dynamic';
 

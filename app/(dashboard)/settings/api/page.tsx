@@ -1,7 +1,6 @@
 import prisma from '@/lib/db';
 import ConfigList from '../ConfigList';
-import dynamic from 'next/dynamic';
-const ApiSettingsClientBlocks = dynamic(() => import('./ApiSettingsClientBlocks'), { ssr: false });
+import ApiSettingsClientBlocks from './ApiSettingsClientBlocks';
 
 export const forceDynamic = 'force-dynamic';
 
