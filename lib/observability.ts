@@ -1,7 +1,15 @@
 import prisma from '@/lib/db';
 import { randomUUID } from 'crypto';
+import { getConfig } from '@/lib/config';
 
-export type LogLevel = 'INFO' | 'WARN' | 'ERROR';
+export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+
+const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
+  DEBUG: 0,
+  INFO: 1,
+  WARN: 2,
+  ERROR: 3,
+};
 
 export interface LogContext {
   requestId?: string;

@@ -4,6 +4,7 @@ import { getBoolConfig, getConfig } from '@/lib/config';
 import { TitleComponent } from '@/app/(dashboard)/settings/title-format/page';
 import { logEvent } from '@/lib/observability';
 
+// Interfaces
 interface TitleFormatConfig {
   components: TitleComponent[];
   useBrackets: boolean;
@@ -306,8 +307,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
 
   return new NextResponse(m3uContent, {
     headers: {
-      'Content-Type': 'application/vnd.apple.mpegurl',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Type': contentType,
+      'Content-Disposition': `attachment; filename="${downloadFilename}"`,
     },
   });
 }
