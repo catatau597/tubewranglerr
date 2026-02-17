@@ -305,6 +305,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
 
   const m3uContent = m3uLines.join('\n');
 
+  const contentType = 'application/vnd.apple.mpegurl';
+  const downloadFilename = filename;
+
   return new NextResponse(m3uContent, {
     headers: {
       'Content-Type': contentType,
