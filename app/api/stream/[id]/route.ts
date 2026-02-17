@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { routeProcess, StreamForRouting } from '@/lib/player/router';
+import { isGenuinelyLive, LiveEngine, routeProcess, StreamForRouting } from '@/lib/player/router';
 import { canUseBinaryRoute, getRequiredBinary, getSmartPlayerMode } from '@/lib/player/capabilities';
 import { PlayerHealthMonitor } from '@/lib/player/health-monitor';
 import { getBoolConfig } from '@/lib/config';
@@ -81,7 +81,25 @@ export async function GET(
     await logEvent('INFO', 'SmartPlayer', 'Proxy access', { videoId, status: stream.status });
   }
 
-  let child = routeProcess(streamForRouting);
+  const liveEngineOrder: LiveEngine[] = ['streamlink', 'yt-dlp'];
+  let liveEngineAttempt = 0;
+
+  const createProcess = () => {
+    if (isGenuinelyLive(streamForRouting)) {
+      const engine = liveEngineOrder[Math.min(liveEngineAttempt, liveEngineOrder.length - 1)];
+      liveEngineAttempt += 1;
+
+      if (liveEngineAttempt > 1) {
+        void logEvent('WARN', 'SmartPlayer', 'Falling back live engine', { videoId, engine });
+      }
+
+      return routeProcess(streamForRouting, { liveEngine: engine });
+    }
+
+    return routeProcess(streamForRouting);
+  };
+
+  let child = createProcess();
   const monitor = new PlayerHealthMonitor({ monitorInterval: 5000, maxRestarts: 3, baseBackoffMs: 750 });
 
   let controllerRef: ReadableStreamDefaultController<Uint8Array> | null = null;
@@ -156,7 +174,7 @@ export async function GET(
     });
   };
 
-  await monitor.attach(videoId, child, () => routeProcess(streamForRouting), (proc) => {
+  await monitor.attach(videoId, child, createProcess, (proc) => {
     child = proc;
     bindProcess(proc);
   });

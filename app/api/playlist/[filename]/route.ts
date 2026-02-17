@@ -32,7 +32,6 @@ interface StreamWithChannel {
   createdAt: Date;
 }
 
-// Utilitários
 function xmlEscape(input: string) {
   return input
     .replace(/&/g, '&amp;')
@@ -60,32 +59,23 @@ function parseMappingConfig(value: string): Record<string, string> {
   return result;
 }
 
-function cleanTitle(title: string, filters: string[]): string {
-    let cleaned = title;
-    for (const filter of filters) {
-        if (!filter) continue;
-        const escapedFilter = filter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(escapedFilter, 'gi');
-        cleaned = cleaned.replace(regex, '');
-    }
-    return cleaned.replace(/[|]/g, ' - ').replace(/\s+/g, ' ').trim();
+function escapeAttribute(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/,/g, '\\,');
 }
 
-function formatDateTimeShort(date: Date | null | undefined): string {
-    if (!date) return '';
-    return new Intl.DateTimeFormat('pt-BR', {
-        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-    }).format(date);
-}
-
-function escapeAttribute(val: string): string {
-  if (!val) return '';
-  return val.replace(/"/g, '');
+function normalizeListValue(value: string, uppercase: boolean): string {
+  return uppercase ? value.toUpperCase() : value;
 }
 
 function appendSuffix(filename: string, suffix: 'direct' | 'proxy') {
   if (filename.endsWith('.m3u8')) {
     return filename.replace('.m3u8', `_${suffix}.m3u8`);
+  }
+  if (filename.endsWith('.m3u')) {
+    return filename.replace('.m3u', `_${suffix}.m3u`);
   }
   return `${filename}_${suffix}`;
 }
@@ -97,15 +87,12 @@ const generateDisplayTitle = (
   statusLabel: string,
   includeStatus: boolean,
   includeChannelName: boolean,
-  titleFilters: string[] = []
 ) => {
-  const cleanedEventName = cleanTitle(stream.title, titleFilters);
-
   const example: Record<string, string> = {
     status: statusLabel,
     channelName: channelTitle,
-    eventName: cleanedEventName,
-    dateTime: formatDateTimeShort(stream.scheduledStart),
+    eventName: stream.title,
+    dateTime: stream.scheduledStart ? new Date(stream.scheduledStart).toLocaleString('pt-BR') : '',
     youtubePlaylist: 'N/A',
   };
 
@@ -124,8 +111,6 @@ const generateDisplayTitle = (
   return titleParts.join(' ');
 };
 
-
-// Main Route Handler
 export async function GET(req: Request, { params }: { params: Promise<{ filename: string }> }) {
   const { filename } = await params;
 
@@ -144,18 +129,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     channelMappingsStr,
     prefixWithStatus,
     prefixWithChannel,
-    titleFilterExpressionsStr,
+    uppercaseGroupTitle,
+    uppercaseDisplayTitle,
     tvgNameUseDisplayTitle,
-    forceUppercaseGroupTitle,
-    forceUppercaseTitle,
+    maxScheduleHours,
+    maxUpcomingPerChannel,
+    placeholderImageUrl,
   ] = await Promise.all([
-    getConfig('PLAYLIST_LIVE_FILENAME', 'playlist_live.m3u8'),
-    getConfig('PLAYLIST_UPCOMING_FILENAME', 'playlist_upcoming.m3u8'),
-    getConfig('PLAYLIST_VOD_FILENAME', 'playlist_vod.m3u8'),
+    getConfig('PLAYLIST_LIVE_FILENAME', 'playlist_live.m3u'),
+    getConfig('PLAYLIST_UPCOMING_FILENAME', 'playlist_upcoming.m3u'),
+    getConfig('PLAYLIST_VOD_FILENAME', 'playlist_vod.m3u'),
     getConfig('XMLTV_FILENAME', 'youtube_epg.xml'),
     getConfig('TUBEWRANGLERR_URL', ''),
     getBoolConfig('KEEP_RECORDED_STREAMS', true),
-    getBoolConfig('PLAYLIST_USE_INVISIBLE_PLACEHOLDER', false),
+    getBoolConfig('USE_INVISIBLE_PLACEHOLDER', false),
     getBoolConfig('PLAYLIST_GENERATE_DIRECT', true),
     getBoolConfig('PLAYLIST_GENERATE_PROXY', true),
     getConfig('TITLE_FORMAT_CONFIG'),
@@ -163,25 +150,21 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     getConfig('CHANNEL_NAME_MAPPINGS'),
     getBoolConfig('PREFIX_TITLE_WITH_STATUS', true),
     getBoolConfig('PREFIX_TITLE_WITH_CHANNEL_NAME', true),
-    getConfig('TITLE_FILTER_EXPRESSIONS', ''),
+    getBoolConfig('GROUP_TITLE_FORCE_UPPERCASE', false),
+    getBoolConfig('DISPLAY_TITLE_FORCE_UPPERCASE', false),
     getBoolConfig('TVG_NAME_USE_DISPLAY_TITLE', false),
-    getBoolConfig('FORCE_UPPERCASE_GROUP_TITLE', false),
-    getBoolConfig('FORCE_UPPERCASE_TITLE', false),
+    getConfig('MAX_SCHEDULE_HOURS', '72'),
+    getConfig('MAX_UPCOMING_PER_CHANNEL', '6'),
+    getConfig('PLACEHOLDER_IMAGE_URL', ''),
   ]);
 
-  const categoryMappings = typeof categoryMappingsStr === 'string' && categoryMappingsStr.length > 0 ? parseMappingConfig(categoryMappingsStr) : {};
-  const channelMappings = typeof channelMappingsStr === 'string' && channelMappingsStr.length > 0 ? parseMappingConfig(channelMappingsStr) : {};
-  const titleFilters = typeof titleFilterExpressionsStr === 'string' && titleFilterExpressionsStr.length > 0
-    ? titleFilterExpressionsStr.split(',').map((s: string) => s.trim()).filter(Boolean)
-    : [];
+  const categoryMappings = parseMappingConfig(categoryMappingsStr);
+  const channelMappings = parseMappingConfig(channelMappingsStr);
 
-  const mode: 'direct' | 'proxy' = filename.includes('_direct') ? 'direct' : 'proxy';
-
-  await logEvent('DEBUG', 'Playlist', `Generating playlist: ${filename}`, { mode, filters: titleFilters });
+  const mode: 'direct' | 'proxy' = filename.includes('_direct.') ? 'direct' : 'proxy';
 
   const liveDirectFilename = appendSuffix(liveFilename, 'direct');
   const liveProxyFilename = appendSuffix(liveFilename, 'proxy');
-  const upcomingDirectFilename = appendSuffix(upcomingFilename, 'direct');
   const upcomingProxyFilename = appendSuffix(upcomingFilename, 'proxy');
   const vodDirectFilename = appendSuffix(vodFilename, 'direct');
   const vodProxyFilename = appendSuffix(vodFilename, 'proxy');
@@ -189,7 +172,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
   let targetStatus: 'live' | 'upcoming' | 'none' | null = null;
   if (filename === liveFilename || filename === liveDirectFilename || filename === liveProxyFilename) {
     targetStatus = 'live';
-  } else if (filename === upcomingFilename || filename === upcomingDirectFilename || filename === upcomingProxyFilename) {
+  } else if (filename === upcomingFilename || filename === upcomingProxyFilename) {
     targetStatus = 'upcoming';
   } else if (filename === vodFilename || filename === vodDirectFilename || filename === vodProxyFilename) {
     targetStatus = 'none';
@@ -232,6 +215,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
       headers: { 'Content-Type': 'application/vnd.apple.mpegurl' },
     });
   }
+
+
+
   if (mode === 'direct' && !generateDirect) {
     return NextResponse.json({ error: 'Playlist direta desativada' }, { status: 404 });
   }
@@ -245,133 +231,79 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     orderBy: [{ scheduledStart: 'asc' }, { createdAt: 'desc' }],
   });
 
-  let titleConfig: TitleFormatConfig = {
-    components: [],
-    useBrackets: true,
-  };
+  const isUpcomingPlaylist = targetStatus === 'upcoming';
+  const upcomingHoursLimit = Number.parseInt(maxScheduleHours, 10) || 72;
+  const upcomingPerChannelLimit = Number.parseInt(maxUpcomingPerChannel, 10) || 6;
 
-  if (titleConfigStr) {
-    try {
-      const parsed = JSON.parse(titleConfigStr);
-      if (parsed && Array.isArray(parsed.components)) {
-        titleConfig = parsed;
-      }
-    } catch (e) {
-      console.warn('Falha ao analisar TITLE_FORMAT_CONFIG, usando padrão:', e);
-    }
-  }
+  const filteredStreams = isUpcomingPlaylist
+    ? (() => {
+        const now = new Date();
+        const futureLimit = new Date(now.getTime() + upcomingHoursLimit * 60 * 60 * 1000);
+        const grouped = new Map<string, number>();
+
+        return streams.filter((stream) => {
+          if (!stream.scheduledStart) return false;
+          if (stream.scheduledStart <= now || stream.scheduledStart > futureLimit) return false;
+
+          const current = grouped.get(stream.channelId) ?? 0;
+          if (current >= upcomingPerChannelLimit) return false;
+          grouped.set(stream.channelId, current + 1);
+          return true;
+        });
+      })()
+    : streams;
+
+  const titleConfig: TitleFormatConfig = titleConfigStr
+    ? JSON.parse(titleConfigStr)
+    : { components: [], useBrackets: true };
 
   const origin = new URL(req.url).origin;
   const appBaseUrl = configuredBaseUrl || origin;
 
-  // Use simple M3U header for channel list. DO NOT use EXT-X-TARGETDURATION which is for media segments.
-  const m3uLines = ['#EXTM3U'];
+  const m3uLines = ['#EXTM3U', '#EXT-X-VERSION:3', '#EXT-X-TARGETDURATION:10'];
 
-  // Default YouTube Category Mapping (ID -> Name)
-  const youtubeCategories: Record<string, string> = {
-    '1': 'Film & Animation',
-    '2': 'Autos & Vehicles',
-    '10': 'Music',
-    '15': 'Pets & Animals',
-    '17': 'Sports',
-    '18': 'Short Movies',
-    '19': 'Travel & Events',
-    '20': 'Gaming',
-    '21': 'Videoblogging',
-    '22': 'People & Blogs',
-    '23': 'Comedy',
-    '24': 'Entertainment',
-    '25': 'News & Politics',
-    '26': 'Howto & Style',
-    '27': 'Education',
-    '28': 'Science & Technology',
-    '29': 'Nonprofits & Activism',
-    '30': 'Movies',
-    '31': 'Anime/Animation',
-    '32': 'Action/Adventure',
-    '33': 'Classics',
-    '34': 'Comedy',
-    '35': 'Documentary',
-    '36': 'Drama',
-    '37': 'Family',
-    '38': 'Foreign',
-    '39': 'Horror',
-    '40': 'Sci-Fi/Fantasy',
-    '41': 'Thriller',
-    '42': 'Shorts',
-    '43': 'Shows',
-    '44': 'Trailers',
-  };
-
-  for (const stream of streams) {
+  for (const stream of filteredStreams) {
     const mappedChannelName = channelMappings[stream.channel.title] || stream.channel.customName || stream.channel.title;
     const statusLabel = stream.status === 'live' ? 'LIVE 🔴' : stream.status === 'upcoming' ? 'AGENDADO' : 'GRAVADO';
-    // Resolve Category Name from ID
-    let categoryName = 'Geral';
-    if (stream.categoryYoutube && youtubeCategories[stream.categoryYoutube]) {
-      categoryName = youtubeCategories[stream.categoryYoutube];
-    }
-    // Determine Group Title:
-    // 1. Try mapping by ID (e.g. "17" -> "Esportes")
-    // 2. Try mapping by Name (e.g. "Sports" -> "Esportes")
-    // 3. Fallback to English Category Name (e.g. "Sports")
-    // 4. Fallback to mappedChannelName if category is unknown/missing
-    let groupTitle = mappedChannelName;
-    if (stream.categoryYoutube) {
-        if (categoryMappings[stream.categoryYoutube]) {
-            groupTitle = categoryMappings[stream.categoryYoutube];
-        } else if (categoryName !== 'Geral' && categoryMappings[categoryName]) {
-            groupTitle = categoryMappings[categoryName];
-        } else if (categoryName !== 'Geral') {
-             groupTitle = categoryName;
-        }
-    }
-    // Log category for debugging mapping issues
-    await logEvent('DEBUG', 'Playlist', `Processing stream: ${stream.title}`, { categoryId: stream.categoryYoutube, categoryName, groupTitle });
-    const displayTitle = generateDisplayTitle(
+    const rawGroupTitle = stream.categoryYoutube
+      ? categoryMappings[stream.categoryYoutube] || mappedChannelName
+      : mappedChannelName;
+    const rawDisplayTitle = generateDisplayTitle(
       stream,
       mappedChannelName,
       titleConfig,
       statusLabel,
       prefixWithStatus,
       prefixWithChannel,
-      titleFilters
     );
-    // TVG Name Logic: Use Display Title if configured, else use Channel Name
-    let tvgName = tvgNameUseDisplayTitle ? displayTitle : mappedChannelName;
-    // Apply Uppercase Filters
-    if (forceUppercaseGroupTitle) {
-        groupTitle = groupTitle.toUpperCase();
-    }
-    // For Display Title (which appears at end of line) and TVG Name
-    let finalDisplayTitle = displayTitle;
-    if (forceUppercaseTitle) {
-        tvgName = tvgName.toUpperCase();
-        finalDisplayTitle = finalDisplayTitle.toUpperCase();
-    }
+
+    const groupTitle = normalizeListValue(rawGroupTitle, uppercaseGroupTitle);
+    const displayTitle = normalizeListValue(rawDisplayTitle, uppercaseDisplayTitle);
+    const tvgName = tvgNameUseDisplayTitle ? displayTitle : mappedChannelName;
+
     const outputUrl = mode === 'direct' ? stream.watchUrl : `${appBaseUrl}/api/stream/${stream.videoId}`;
-    await logEvent('DEBUG', 'Playlist', `Stream added to M3U`, { displayTitle: finalDisplayTitle, outputUrl });
-    // Use escapeAttribute to safely quote attributes
+    const tvgLogo = stream.thumbnailUrl || stream.channel.thumbnailUrl || placeholderImageUrl;
+
+    await logEvent('DEBUG', 'Playlist', 'Processing stream', {
+      filename,
+      mode,
+      videoId: stream.videoId,
+      status: stream.status,
+      groupTitle,
+    });
+
     m3uLines.push(
-        `#EXTINF:-1 tvg-id="${escapeAttribute(stream.channel.id)}" tvg-name="${escapeAttribute(tvgName)}" tvg-logo="${stream.channel.thumbnailUrl || ''}" group-title="${escapeAttribute(groupTitle)}",${finalDisplayTitle}`,
+      `#EXTINF:-1 tvg-id="${escapeAttribute(stream.channel.id)}" tvg-name="${escapeAttribute(tvgName)}" tvg-logo="${escapeAttribute(tvgLogo || '')}" group-title="${escapeAttribute(groupTitle)}",${escapeAttribute(displayTitle)}`,
     );
     m3uLines.push(outputUrl);
   }
 
-  if (streams.length === 0 && useInvisiblePlaceholder) {
+  if (filteredStreams.length === 0 && useInvisiblePlaceholder) {
     m3uLines.push('#EXTINF:-1 tvg-id="placeholder" tvg-name="Placeholder" group-title="SYSTEM",SEM EVENTOS');
     m3uLines.push('#http://placeholder.local/stream');
   }
 
   const m3uContent = m3uLines.join('\n');
-
-  // Use .m3u and audio/x-mpegurl for ALL playlists to ensure maximum compatibility (VLC, IPTV players).
-  // Even for proxy mode (which links to HLS), a simple .m3u playlist is more widely supported as a channel list.
-  const fileExtension = 'm3u';
-  const contentType = 'audio/x-mpegurl';
-  
-  // Ensure filename has correct extension if not already present or replace it
-  const downloadFilename = filename.replace(/\.(m3u|m3u8)$/, '') + `.${fileExtension}`;
 
   return new NextResponse(m3uContent, {
     headers: {
