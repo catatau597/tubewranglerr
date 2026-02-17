@@ -3,7 +3,7 @@ import ConfigList from './ConfigList';
 import dynamic from 'next/dynamic';
 const SettingsClientBlocks = dynamic(() => import('./SettingsClientBlocks'), { ssr: false });
 
-export const dynamic = 'force-dynamic';
+export const forceDynamic = 'force-dynamic';
 
 async function getConfigs() {
   // Busca todas as configurações para a página principal

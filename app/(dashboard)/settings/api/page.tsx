@@ -3,7 +3,7 @@ import ConfigList from '../ConfigList';
 import dynamic from 'next/dynamic';
 const ApiSettingsClientBlocks = dynamic(() => import('./ApiSettingsClientBlocks'), { ssr: false });
 
-export const dynamic = 'force-dynamic';
+export const forceDynamic = 'force-dynamic';
 
 async function getConfigs() {
   // Busca apenas configs da categoria 'API & Canais'
