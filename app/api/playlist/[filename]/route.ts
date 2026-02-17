@@ -157,7 +157,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ filename
     getBoolConfig('TVG_NAME_USE_DISPLAY_TITLE', false),
     getConfig('MAX_SCHEDULE_HOURS', '72'),
     getConfig('MAX_UPCOMING_PER_CHANNEL', '6'),
-    getConfig('PLACEHOLDER_IMAGE_URL', '')
+    getConfig('PLACEHOLDER_IMAGE_URL', ''),
   ];
 
   const categoryMappings = parseMappingConfig(categoryMappingsStr);
