@@ -11,18 +11,17 @@ export default function CookiesUpload() {
   const [cookieFiles, setCookieFiles] = useState<CookieFile[]>([]);
 
   async function fetchCookieFiles() {
-    // Lista arquivos .txt na pasta /app (simples, via API customizada futuramente)
-    // Por enquanto, assume que só há cookies.txt, youtube.txt, daylomotin.txt, etc.
-    // Simula listagem (em produção, idealmente um endpoint que lista arquivos)
-    const possible = ['cookies.txt', 'youtube.txt', 'daylomotin.txt'];
-    const found: CookieFile[] = [];
-    for (const name of possible) {
-      try {
-        const res = await fetch(`/app/${name}`);
-        if (res.ok) found.push({ name });
-      } catch {}
+    try {
+      const res = await fetch('/api/config/cookies-list');
+      if (res.ok) {
+        const data = await res.json();
+        setCookieFiles((data.files || []).map((name: string) => ({ name })));
+      } else {
+        setCookieFiles([]);
+      }
+    } catch {
+      setCookieFiles([]);
     }
-    setCookieFiles(found);
   }
 
   useEffect(() => { fetchCookieFiles(); }, []);

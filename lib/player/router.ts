@@ -1,3 +1,22 @@
+import fs from 'fs';
+import path from 'path';
+function pickCookiesFile(watchUrl: string): string | undefined {
+  try {
+    const cookiesDir = path.resolve(process.cwd(), 'app');
+    const files = fs.readdirSync(cookiesDir).filter(f => f.endsWith('.txt'));
+    const url = new URL(watchUrl);
+    if (url.hostname.includes('youtube')) {
+      if (files.includes('youtube.txt')) return path.join(cookiesDir, 'youtube.txt');
+    }
+    if (url.hostname.includes('dailymotion')) {
+      if (files.includes('daylomotin.txt')) return path.join(cookiesDir, 'daylomotin.txt');
+    }
+    if (files.includes('cookies.txt')) return path.join(cookiesDir, 'cookies.txt');
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 
 export interface StreamForRouting {
@@ -98,7 +117,11 @@ export function routeProcess(
   options?: { liveEngine?: LiveEngine, userAgent?: string, cookiesPath?: string }
 ): ChildProcessWithoutNullStreams {
   const userAgent = options?.userAgent;
-  const cookiesPath = options?.cookiesPath;
+  // Se cookiesPath não for passado explicitamente, tenta escolher automaticamente
+  let cookiesPath = options?.cookiesPath;
+  if (!cookiesPath) {
+    cookiesPath = pickCookiesFile(stream.watchUrl);
+  }
   if (isGenuinelyLive(stream)) {
     const engine = options?.liveEngine ?? 'streamlink';
     return engine === 'yt-dlp'
