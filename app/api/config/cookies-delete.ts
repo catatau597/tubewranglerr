@@ -1,18 +1,21 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import fs from 'fs';
+import { NextResponse } from 'next/server';
+import { unlink } from 'fs/promises';
 import path from 'path';
+import { existsSync } from 'fs';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'DELETE') {
-    return res.status(405).end('Method Not Allowed');
-  }
-  const cookiesPath = path.resolve(process.cwd(), 'app', 'cookies.txt');
+export async function DELETE(req: Request) {
   try {
-    if (fs.existsSync(cookiesPath)) {
-      fs.unlinkSync(cookiesPath);
+    const { searchParams } = new URL(req.url);
+    const file = searchParams.get('file') || 'cookies.txt';
+    if (!file.endsWith('.txt')) {
+      return NextResponse.json({ error: 'Arquivo inválido' }, { status: 400 });
     }
-    res.status(200).json({ success: true });
+    const cookiesPath = path.resolve(process.cwd(), 'app', file);
+    if (existsSync(cookiesPath)) {
+      await unlink(cookiesPath);
+    }
+    return NextResponse.json({ success: true });
   } catch (e) {
-    res.status(500).json({ error: 'Falha ao excluir cookies.txt' });
+    return NextResponse.json({ error: 'Falha ao excluir arquivo' }, { status: 500 });
   }
 }
