@@ -5,6 +5,24 @@ type CookieFile = { name: string };
 
 
 export default function CookiesUpload() {
+    const handleUpload = async () => {
+      if (!files || files.length === 0) return;
+      setLoading(true);
+      setStatus('Enviando...');
+      const formData = new FormData();
+      Array.from(files).forEach(f => formData.append('file', f, f.name));
+      const res = await fetch('/api/config/cookies-upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        setStatus('Cookies enviados com sucesso!');
+        fetchCookieFiles();
+      } else {
+        setStatus('Falha ao enviar cookies.');
+      }
+      setLoading(false);
+    };
   const [files, setFiles] = useState<FileList | null>(null);
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
