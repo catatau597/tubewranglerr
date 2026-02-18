@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(405).end('Method Not Allowed');
   }
 
-  const cookiesDir = path.resolve(process.cwd(), 'app');
+  const cookiesDir = path.resolve(process.cwd(), 'app', 'cookies');
   if (!fs.existsSync(cookiesDir)) fs.mkdirSync(cookiesDir, { recursive: true });
 
   const contentType = req.headers['content-type'] || '';

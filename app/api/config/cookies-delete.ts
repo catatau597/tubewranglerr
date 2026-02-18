@@ -10,7 +10,7 @@ export async function DELETE(req: Request) {
     if (!file.endsWith('.txt')) {
       return NextResponse.json({ error: 'Arquivo inválido' }, { status: 400 });
     }
-    const cookiesPath = path.resolve(process.cwd(), 'app', file);
+    const cookiesPath = path.resolve(process.cwd(), 'app', 'cookies', file);
     if (existsSync(cookiesPath)) {
       await unlink(cookiesPath);
     }

@@ -4,7 +4,7 @@ import path from 'path';
 
 export async function GET() {
   try {
-    const cookiesDir = path.resolve(process.cwd(), 'app');
+    const cookiesDir = path.resolve(process.cwd(), 'app', 'cookies');
     const files = await readdir(cookiesDir);
     const txtFiles = files.filter(f => f.endsWith('.txt'));
     return NextResponse.json({ files: txtFiles });

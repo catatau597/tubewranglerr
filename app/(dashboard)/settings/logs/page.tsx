@@ -17,6 +17,7 @@ export default async function LogsSettingsPage() {
       </div>
       <div className="grid gap-6">
         <ConfigList initialConfigs={configs} />
+        <a href="/dashboard/settings/logs/system-logs" className="text-blue-600 underline text-sm mt-2">Ver logs do sistema &rarr;</a>
       </div>
     </div>
   );
